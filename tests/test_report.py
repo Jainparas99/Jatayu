@@ -1,4 +1,4 @@
-from unpinned.models import ExploitResult, Iteration, RunSummary, SuiteCounts, VerifyReport
+from unpinned.models import ExploitResult, Failure, Iteration, RunSummary, SuiteCounts, VerifyReport
 from unpinned.report import markdown, rows
 
 
@@ -42,3 +42,77 @@ def test_agent_summary_is_not_presented_as_measured_results():
     row = rows([run])[0]
     assert row["tests"] == "unverified"
     assert row["exploits_blocked"] == "unverified"
+
+
+def test_unverified_deprecation_claims_are_hidden():
+    run = _run("b0", 999, 0, True)
+    run.final.artifacts_verified = False
+    run.final.deprecation_warnings = 0
+    run.final.django_version = "5.2.18"
+    row = rows([run])[0]
+    assert row["deprecations"] == "unverified"
+    assert row["django"] == "unverified"
+
+
+def test_baseline_is_visible_when_migration_has_not_recorded_a_result():
+    run = _run("unpinned", 25, 0, False)
+    run.baseline_report = run.final.model_copy(deep=True)
+    run.baseline_report.django_version = "4.2.30"
+    run.iterations = []
+    run.wall_seconds = 73.6
+    before, after = rows([run])
+    assert before["run"] == "Before upgrade"
+    assert before["tests"] == "25/25" and before["django"] == "4.2.30"
+    assert before["wall_s"] == "-"  # no baseline-specific timer was recorded
+    assert after["tests"] == "not recorded" and after["evidence"] == "not recorded"
+    assert after["iterations"] == 0
+
+
+def test_startup_crash_is_not_presented_as_an_executed_test():
+    run = _run("b0", 0, 0, False)
+    run.final.suite.errors = 1
+    run.final.tests_exit_code = 1
+    run.final.failures = [Failure(test="test run did not start", trace_head="index_together")]
+    assert rows([run])[0]["tests"] == "not started"
+
+
+def test_real_testcase_error_keeps_its_recorded_count():
+    run = _run("b0", 0, 0, False)
+    run.final.suite.errors = 1
+    run.final.failures = [Failure(test="workboard.tests.test_save", trace_head="database")]
+    assert rows([run])[0]["tests"] == "0/1"
+
+
+def test_missing_check_status_is_not_zero_issues():
+    run = _run("b0", 25, 0, False)
+    run.final.checks_exit_code = None
+    assert rows([run])[0]["check_issues"] == "not recorded"
+    run.final.checks_exit_code = 2
+    assert rows([run])[0]["check_issues"] == "failed (exit 2)"
+
+
+def test_local_fixture_is_labeled_and_cannot_supply_product_metrics():
+    run = _run("unpinned", 25, 0, True)
+    run.final.evidence_source = "local_fixture"
+    run.final.deprecation_warnings = 0
+    row = rows([run])[0]
+    assert row["evidence"] == "local fixture (not sandbox)"
+    for key in ("tests", "check_issues", "deprecations", "exploits_blocked"):
+        assert row[key] == "unverified"
+
+
+def test_both_trust_fields_are_required():
+    run = _run("b0", 25, 0, False)
+    run.final.artifacts_verified = False
+    assert rows([run])[0]["evidence"] == "unverified sandbox artifacts"
+    assert rows([run])[0]["tests"] == "unverified"
+
+
+def test_before_and_after_use_their_own_recorded_versions():
+    run = _run("unpinned", 25, 0, True)
+    run.final.django_version = "5.2.18"
+    run.baseline_report = run.final.model_copy(deep=True)
+    run.baseline_report.django_version = "4.2.30"
+    before, after = rows([run])
+    assert before["django"] == "4.2.30" and after["django"] == "5.2.18"
+    assert before["deprecations"] == "-"  # unavailable is distinct from measured zero
