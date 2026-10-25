@@ -1,0 +1,24 @@
+name: Jatayu end-of-life check
+description: >
+  Flags dependency manifests that pin end-of-life frameworks or runtimes
+  (Django, Rails, Spring Boot, Python, Node.js) and points to the upgrade target.
+branding:
+  icon: shield
+  color: orange
+inputs:
+  path:
+    description: Directory to scan
+    default: "."
+  fail-on:
+    description: "eol | expiring | never"
+    default: eol
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - shell: bash
+      run: python -m pip install --quiet "${{ github.action_path }}"
+    - shell: bash
+      run: python -m unpinned.fleet scan "${{ inputs.path }}" --github --fail-on "${{ inputs.fail-on }}"

@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jatayu · Fleet</title>
+<style>
+  :root { --ink:#141414; --muted:#5f6368; --line:#e3e3e3; --bg:#fafaf8;
+          --crit:#b3261e; --high:#d93025; --med:#b06000; --low:#5f6368; --ok:#137333; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:17px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif; color:var(--ink); background:var(--bg); }
+  header { padding:1.5rem 2rem 1rem; border-bottom:1px solid var(--line); background:#fff; }
+  header h1 { margin:0; font-size:1.6rem; letter-spacing:-.01em; }
+  header p { margin:.25rem 0 0; color:var(--muted); }
+  nav a { color:var(--muted); margin-right:1rem; text-decoration:none; }
+  nav a.on { color:var(--ink); font-weight:600; }
+  main { max-width:1150px; margin:0 auto; padding:1.5rem 2rem 4rem; }
+  .tiles { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1.5rem; }
+  .tile { background:#fff; border:1px solid var(--line); border-radius:10px; padding:1rem 1.2rem; }
+  .tile b { display:block; font-size:2rem; line-height:1.1; font-variant-numeric:tabular-nums; }
+  .tile span { color:var(--muted); font-size:.92rem; }
+  .tile.bad b { color:var(--high); }
+  .repo { background:#fff; border:1px solid var(--line); border-radius:10px; margin-bottom:1rem; }
+  .repo h2 { font-size:1.05rem; margin:0; padding:.8rem 1.2rem; display:flex; gap:.7rem; align-items:center; border-bottom:1px solid var(--line); word-break:break-all; }
+  .chip { font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; padding:.15rem .5rem; border-radius:999px; color:#fff; flex:none; }
+  .critical { background:var(--crit); } .high { background:var(--high); } .medium { background:var(--med); }
+  .low { background:var(--low); } .none { background:var(--ok); }
+  table { width:100%; border-collapse:collapse; }
+  td { padding:.6rem 1.2rem; border-top:1px solid #f0f0f0; vertical-align:top; }
+  tr:first-child td { border-top:0; }
+  .muted { color:var(--muted); font-size:.9rem; }
+  .eng { font-size:.8rem; padding:.1rem .45rem; border:1px solid var(--line); border-radius:6px; white-space:nowrap; }
+  .eng.ready { border-color:var(--ok); color:var(--ok); }
+  code { background:#f2f2ef; padding:.15rem .4rem; border-radius:5px; font-size:.88rem; }
+  button { font:inherit; padding:.55rem 1.1rem; border-radius:8px; border:0; background:var(--ink); color:#fff; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--ink); border:1px solid var(--line); padding:.2rem .6rem; font-size:.85rem; }
+  details { background:#fff; border:1px solid var(--line); border-radius:10px; padding:.8rem 1.2rem; margin-bottom:1.5rem; }
+  textarea, input { width:100%; font:inherit; padding:.5rem; border:1px solid var(--line); border-radius:8px; margin:.4rem 0 .8rem; }
+  .empty { color:var(--muted); padding:2rem; text-align:center; background:#fff; border:1px dashed var(--line); border-radius:10px; }
+  .err { color:var(--high); }
+  @media (max-width:800px){ .tiles{ grid-template-columns:repeat(2,1fr);} main{padding:1rem;} }
+</style>
+</head>
+<body>
+<header>
+  <nav><a href="/">Upgrade runs</a><a class="on" href="/fleet">Fleet</a></nav>
+  <h1>Which of our apps are on frameworks nobody patches anymore?</h1>
+  <p id="asof">Reads dependency manifests only. No code leaves the repo for this view.</p>
+</header>
+<main>
+  <div class="tiles">
+    <div class="tile"><b id="t-repos">–</b><span>repos scanned</span></div>
+    <div class="tile bad"><b id="t-eol">–</b><span>end-of-life components</span></div>
+    <div class="tile"><b id="t-exp">–</b><span>losing support within 180 days</span></div>
+    <div class="tile"><b id="t-ready">–</b><span>Jatayu can upgrade now</span></div>
+  </div>
+
+  <details>
+    <summary>Scan repositories</summary>
+    <p class="muted">Public GitHub URLs, one per line (max 25). Needs the dashboard token; it stays in this tab's memory only.</p>
+    <textarea id="targets" rows="4" placeholder="https://github.com/owner/repo"></textarea>
+    <input id="token" type="password" placeholder="Dashboard token" autocomplete="off">
+    <button id="scan">Scan</button> <span id="scanmsg" class="muted"></span>
+  </details>
+
+  <div id="repos"><div class="empty">Loading…</div></div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+// Everything from the API is escaped before it reaches the page (repo names are user input).
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let token = "";
+
+function stateText(st) {
+  if (st.status === "eol") return `<b class="err">End of life since ${esc(st.eol)}</b> · ${st.days_overdue} days unpatched`;
+  if (st.status === "expiring") return `Support ends ${esc(st.eol)} · ${st.days_left} days left`;
+  if (st.status === "supported") return `Supported until ${esc(st.eol)}`;
+  return "Release not in catalog";
+}
+
+function render(data) {
+  const s = data.summary;
+  $("t-repos").textContent = s.repos; $("t-eol").textContent = s.eol_components;
+  $("t-exp").textContent = s.expiring_components; $("t-ready").textContent = s.jatayu_ready;
+  $("asof").textContent = `Scanned ${data.scanned_at} · support dates from endoflife.date as of ${data.catalog_as_of} · manifests only, no code sent to a model.`;
+  if (!data.repos.length) { $("repos").innerHTML = '<div class="empty">No repositories in this scan.</div>'; return; }
+  $("repos").innerHTML = data.repos.map((r) => {
+    const rows = r.error
+      ? `<tr><td class="err">Could not scan: ${esc(r.error)}</td></tr>`
+      : r.components.length
+        ? r.components.map((c) => {
+            const st = c.status, fd = c.finding;
+            const rec = st.recommended ? `→ upgrade to <b>${esc(st.recommended)}</b> (${esc(st.recommended_latest)})` : "";
+            const ext = st.extended_support ? `<div class="muted">Commercial support until ${esc(st.extended_support)}</div>` : "";
+            const cmd = c.engine === "ready" && (st.status === "eol" || st.status === "expiring") && r.target.startsWith("https://")
+              ? `<div><code>jatayu run ${esc(r.target)}</code> <button class="ghost" data-copy="jatayu run ${esc(r.target)}">copy</button></div>` : "";
+            return `<tr>
+              <td style="width:24%"><b>${esc(c.label)} ${esc(fd.version)}</b><div class="muted">${esc(fd.source)}:${fd.line} · ${esc(fd.confidence)}</div></td>
+              <td>${stateText(st)} ${rec}${ext}${cmd}</td>
+              <td style="width:1%"><span class="chip ${esc(c.severity)}">${esc(c.severity)}</span></td>
+              <td style="width:1%"><span class="eng ${esc(c.engine)}">${c.engine === "ready" ? "Jatayu ready" : c.engine === "roadmap" ? "roadmap" : "generic"}</span></td>
+            </tr>`;
+          }).join("")
+        : `<tr><td class="muted">No recognized framework or runtime manifests.</td></tr>`;
+    return `<section class="repo"><h2><span class="chip ${esc(r.severity)}">${esc(r.severity)}</span>${esc(r.target)}
+      ${r.commit ? `<span class="muted">@ ${esc(r.commit.slice(0, 10))}</span>` : ""}</h2><table>${rows}</table></section>`;
+  }).join("");
+}
+
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("[data-copy]");
+  if (t) { navigator.clipboard?.writeText(t.dataset.copy); t.textContent = "copied"; }
+});
+
+async function load() {
+  try {
+    const r = await fetch("/api/fleet/latest");
+    if (r.status === 404) { $("repos").innerHTML = '<div class="empty">No fleet scan yet. Run <code>python -m unpinned.fleet scan &lt;repos&gt; --save</code> or use “Scan repositories”.</div>'; return; }
+    render(await r.json());
+  } catch (e) { $("repos").innerHTML = `<div class="empty err">${esc(e.message)}</div>`; }
+}
+
+$("scan").onclick = async () => {
+  token = $("token").value; $("token").value = "";
+  const targets = $("targets").value.split("\n").map((s) => s.trim()).filter(Boolean);
+  $("scanmsg").textContent = "Scanning…"; $("scan").disabled = true;
+  try {
+    const r = await fetch("/api/fleet/scan", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }, body: JSON.stringify({ targets }) });
+    const body = await r.json();
+    if (!r.ok) throw new Error(typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail));
+    render(body); $("scanmsg").textContent = "Done.";
+  } catch (e) { $("scanmsg").textContent = e.message; }
+  finally { $("scan").disabled = false; }
+};
+load();
+</script>
+</body>
+</html>
