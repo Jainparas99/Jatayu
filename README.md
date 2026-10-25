@@ -79,3 +79,25 @@ Commit range is pending the initial commit. No completed migration benchmark is 
 ## License
 
 [MIT](LICENSE) — Copyright 2026 Paras Jain.
+
+
+## Runs and Fleet workspace
+
+`uv run jatayu serve` starts the shared server at `http://127.0.0.1:8000`:
+
+- **Runs** (`/`): saved run history, independent evidence status, blockers, full patch SHA-256,
+  diff inspection/download, and an approval button bound to the reviewed patch.
+- **Fleet** (`/fleet`): find unsupported framework/runtime pins. Also available as
+  `uv run jatayu fleet scan /path/to/repo --save`.
+- **Configuration** (in Runs): credential presence flags and safe execution defaults.
+  Credential values are never returned by this view.
+
+Set `JATAYU_DASHBOARD_TOKEN` in the server environment to allow write requests. The browser's
+password field keeps its token only in tab memory. The server validates it on each action.
+Reads require your hosting platform's access controls; see [deployment instructions](deploy/README.md).
+Use the existing Dockerfile and `unpinned.server:app` for deployment. Containers need persistent
+storage for durable run artifacts; Cloud Run's default filesystem is ephemeral.
+
+Migrations currently start from the CLI on the server. Browser launch and PR publication are
+unavailable. The approval button stays disabled until both evidence gates and publication support
+are ready. Local fixture proofs and model summaries never count as verified sandbox results.

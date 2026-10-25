@@ -289,11 +289,22 @@ def doctor() -> None:
         con.print("Git currently belongs to a parent folder. Do not stage from the parent.")
 
 
+@app.command(
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+    add_help_option=False,
+)
+def fleet(ctx: typer.Context) -> None:
+    """Scan framework support dates. Use `jatayu fleet --help` for Fleet options."""
+    from .fleet.__main__ import main
+
+    raise typer.Exit(main(ctx.args))
+
+
 @app.command()
 def serve(port: int = 8000) -> None:
     import uvicorn
 
-    uvicorn.run("unpinned.api:app", host="127.0.0.1", port=port, reload=False)
+    uvicorn.run("unpinned.server:app", host="127.0.0.1", port=port, reload=False)
 
 
 if __name__ == "__main__":
