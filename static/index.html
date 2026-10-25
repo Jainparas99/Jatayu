@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Jatayu</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /* Thin control surface, not a dashboard (HACKATHON.md). Large type for the projector. */
+  body { font: 18px/1.5 system-ui, sans-serif; margin: 2rem auto; max-width: 1000px; padding: 0 1rem; color: #111; }
+  h1 { font-size: 1.8rem; margin: 0 0 .25rem; }
+  .sub { color: #555; margin-bottom: 1.5rem; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td { border-bottom: 1px solid #ddd; padding: .5rem; text-align: left; }
+  .stages { display: flex; gap: .5rem; flex-wrap: wrap; }
+  .stage { padding: .3rem .7rem; border-radius: 999px; background: #eee; }
+  .stage.done { background: #d6f5dd; } .stage.fail { background: #fbd5d5; }
+  button { font-size: 1.1rem; padding: .7rem 1.4rem; border: 0; border-radius: 8px; background: #111; color: #fff; cursor: pointer; }
+  button:disabled { opacity: .4; cursor: default; }
+  pre { background: #f6f6f6; padding: 1rem; overflow: auto; font-size: 14px; }
+</style>
+</head>
+<body>
+<h1>Jatayu</h1>
+<div class="sub">Django migration evidence review. Live sandbox verification is pending. Publication stays disabled until evidence and approval are complete.</div>
+
+<label>Run: <select id="run"></select></label>
+<div class="stages" id="stages"></div>
+
+<h2>Measured results</h2>
+<div id="table">Loading…</div>
+
+<h2>Iterations</h2>
+<pre id="iters"></pre>
+
+<h2>Patch and verification</h2>
+<pre id="diff"></pre>
+<pre id="blockers"></pre>
+
+<button id="approve" disabled>Approve &amp; open PR</button>
+<pre id="out"></pre>
+
+<script>
+// CP4: stream stages, show the diff list, wire Approve. Every number here comes from runs/*.json.
+const $ = (id) => document.getElementById(id);
+async function j(url, opts) { const r = await fetch(url, opts); if (!r.ok) throw new Error(await r.text()); return r.json(); }
+
+async function load() {
+  const runs = await j('/api/runs');
+  $('run').replaceChildren(...runs.map(r => {
+    const option = document.createElement('option');
+    option.value = r.run_id; option.textContent = r.run_id; return option;
+  }));
+  const t = await j('/api/table');
+  $('table').replaceChildren();
+  if (t.rows.length) {
+    const table = document.createElement('table');
+    for (const [i, values] of [Object.keys(t.rows[0]), ...t.rows.map(Object.values)].entries()) {
+      const row = table.insertRow();
+      for (const value of values) { const cell = document.createElement(i === 0 ? 'th' : 'td'); cell.textContent = value; row.append(cell); }
+    }
+    $('table').append(table);
+  } else $('table').textContent = 'No recorded runs yet.';
+  if (runs.length) { $('run').value = runs[runs.length - 1].run_id; await show($('run').value); }
+  else { $('blockers').textContent = 'No migration evidence yet. Complete the verification checkpoint first.'; }
+}
+
+async function show(id) {
+  $('approve').disabled = true;
+  const s = await j(`/api/runs/${encodeURIComponent(id)}`);
+  const review = await j(`/api/runs/${encodeURIComponent(id)}/review`);
+  if ($('run').value !== id) return;
+  const its = s.iterations || [];
+  $('stages').textContent = review.ready_for_review ? 'Ready for review' : 'Verification incomplete';
+  $('iters').textContent = its.map(i => `#${i.n}: ${JSON.stringify(i.report.suite)} exploits=${JSON.stringify(i.report.exploits.map(e => [e.cve, e.blocked]))}`).join('\n');
+  $('diff').textContent = review.diff || 'No reviewable patch available.';
+  $('blockers').textContent = review.blockers.join('\n') || 'Evidence checks passed.';
+  $('approve').disabled = !review.ready_for_review || !review.publication_available || !!s.pr_url;
+  if (!review.publication_available) $('out').textContent = 'PR publication is not implemented yet.';
+  $('approve').onclick = async () => {
+    $('approve').disabled = true;
+    try { $('out').textContent = JSON.stringify(await j(`/api/runs/${encodeURIComponent(id)}/approve`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({patch_sha256: review.patch_sha256})
+    }), null, 2); }
+    catch (e) { $('out').textContent = e.message; }
+  };
+}
+$('run').onchange = (e) => show(e.target.value).catch(err => $('out').textContent = err.message);
+load().catch(e => $('table').textContent = e.message);
+</script>
+</body>
+</html>

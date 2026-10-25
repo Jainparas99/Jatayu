@@ -1,0 +1,20 @@
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+docs/internal/
+runs/*
+!runs/.gitkeep
+!runs/sample-*/
+work/
+.DS_Store
+
+# Docs and agent instructions stay local; only READMEs are published.
+# Prompt templates are .md files the code loads at runtime, so they stay tracked.
+*.md
+!README.md
+!src/unpinned/prompts/*.md
