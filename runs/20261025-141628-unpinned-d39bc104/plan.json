@@ -1,0 +1,100 @@
+{
+  "items": [
+    {
+      "file": "requirements.txt",
+      "fix": "Update the pinned version from `Django==4.2.30` to `Django==5.2.18`.",
+      "line": 1,
+      "rule": "Welcome to Django 5.2!"
+    },
+    {
+      "file": "config/settings.py",
+      "fix": "Remove `USE_L10N = False`; localized formatting is now always enabled by default, and unlocalized output is controlled in templates via `l10n` tags/filters.",
+      "line": 48,
+      "rule": "The USE_L10N setting is removed."
+    },
+    {
+      "file": "config/settings.py",
+      "fix": "Replace `DEFAULT_FILE_STORAGE = \"workboard.storage.ExportStorage\"` with `STORAGES = {\"default\": {\"BACKEND\": \"workboard.storage.ExportStorage\"}, \"staticfiles\": {\"BACKEND\": \"django.contrib.staticfiles.storage.StaticFilesStorage\"}}`.",
+      "line": 54,
+      "rule": "The DEFAULT_FILE_STORAGE and STATICFILES_STORAGE settings is removed."
+    },
+    {
+      "file": "workboard/migrations/0001_initial.py",
+      "fix": "Replace `\"index_together\": {(\"owner\", \"status\")}` in `CreateModel` options with `\"indexes\": [models.Index(fields=[\"owner\", \"status\"], name=\"workboard_c_owner_i_7a3869_idx\")]`.",
+      "line": 52,
+      "rule": "The model\u2019s Meta.index_together option is removed."
+    },
+    {
+      "file": "workboard/models.py",
+      "fix": "Replace `index_together = [(\"owner\", \"status\")]` on `Card.Meta` with `indexes = [models.Index(fields=[\"owner\", \"status\"])]`.",
+      "line": 31,
+      "rule": "The model\u2019s Meta.index_together option is removed."
+    },
+    {
+      "file": "workboard/services.py",
+      "fix": "Remove `from django.utils import timezone` and import `UTC` (or `timezone`) from Python's standard library `datetime` module instead.",
+      "line": 7,
+      "rule": "The django.utils.timezone.utc alias to datetime.timezone.utc is removed."
+    },
+    {
+      "file": "workboard/services.py",
+      "fix": "Replace `tzinfo=timezone.utc` (from `django.utils.timezone`) with `tzinfo=datetime.UTC` (or `datetime.timezone.utc`).",
+      "line": 14,
+      "rule": "The django.utils.timezone.utc alias to datetime.timezone.utc is removed."
+    },
+    {
+      "file": "workboard/templates/workboard/board.html",
+      "fix": "Replace `{% if cards|length_is:\"0\" %}` with `{% if cards|length == 0 %}` (or `{% if not cards %}`).",
+      "line": 4,
+      "rule": "The length_is template filter is removed."
+    },
+    {
+      "file": "workboard/templates/workboard/board.html",
+      "fix": "Replace `{% if cards|length_is:\"1\" %}` with `{% if cards|length == 1 %}`.",
+      "line": 5,
+      "rule": "The length_is template filter is removed."
+    },
+    {
+      "file": "workboard/templates/workboard/board.html",
+      "fix": "Load `{% load l10n %}` and render `{{ card.estimate|unlocalize }}` (or wrap in `{% localize off %}...{% endlocalize %}`) so budget values remain machine-readable (`1234.50`) across locales without `USE_L10N = False`.",
+      "line": 6,
+      "rule": "The USE_L10N setting is removed."
+    },
+    {
+      "file": "workboard/tests/test_models.py",
+      "fix": "Rename `self.assertQuerysetEqual(...)` to `self.assertQuerySetEqual(...)`.",
+      "line": 22,
+      "rule": "The TransactionTestCase.assertQuerysetEqual() method is removed."
+    },
+    {
+      "file": "workboard/tests/test_models.py",
+      "fix": "Rename `self.assertQuerysetEqual(...)` to `self.assertQuerySetEqual(...)`.",
+      "line": 27,
+      "rule": "The TransactionTestCase.assertQuerysetEqual() method is removed."
+    },
+    {
+      "file": "workboard/tests/test_services.py",
+      "fix": "Replace `DEFAULT_FILE_STORAGE=\"workboard.storage.ExportStorage\"` in `override_settings` with `STORAGES={\"default\": {\"BACKEND\": \"workboard.storage.ExportStorage\"}, \"staticfiles\": {\"BACKEND\": \"django.contrib.staticfiles.storage.StaticFilesStorage\"}}`.",
+      "line": 27,
+      "rule": "The DEFAULT_FILE_STORAGE and STATICFILES_STORAGE settings is removed."
+    },
+    {
+      "file": "workboard/tests/test_services.py",
+      "fix": "Replace `DEFAULT_FILE_STORAGE=\"workboard.storage.ExportStorage\"` in `override_settings` with `STORAGES={\"default\": {\"BACKEND\": \"workboard.storage.ExportStorage\"}, \"staticfiles\": {\"BACKEND\": \"django.contrib.staticfiles.storage.StaticFilesStorage\"}}`.",
+      "line": 42,
+      "rule": "The DEFAULT_FILE_STORAGE and STATICFILES_STORAGE settings is removed."
+    },
+    {
+      "file": "workboard/tests/test_views.py",
+      "fix": "Remove `USE_L10N=False` from `@override_settings(LANGUAGE_CODE=\"de\", USE_L10N=False)` so it is `@override_settings(LANGUAGE_CODE=\"de\")`.",
+      "line": 63,
+      "rule": "The USE_L10N setting is removed."
+    },
+    {
+      "file": "workboard/tests/test_views.py",
+      "fix": "Replace `DEFAULT_FILE_STORAGE=\"workboard.storage.ExportStorage\"` in `override_settings` with `STORAGES={\"default\": {\"BACKEND\": \"workboard.storage.ExportStorage\"}, \"staticfiles\": {\"BACKEND\": \"django.contrib.staticfiles.storage.StaticFilesStorage\"}}`.",
+      "line": 125,
+      "rule": "The DEFAULT_FILE_STORAGE and STATICFILES_STORAGE settings is removed."
+    }
+  ]
+}

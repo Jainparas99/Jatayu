@@ -1,0 +1,89 @@
+{
+  "approved": false,
+  "baseline_report": {
+    "artifacts_verified": true,
+    "check": [],
+    "checks_exit_code": 0,
+    "deprecation_warnings": null,
+    "django_version": "4.2.30",
+    "evidence_source": "sandbox_artifacts",
+    "exploits": [
+      {
+        "benign_control_passed": true,
+        "blocked": false,
+        "cve": "CVE-2026-87975",
+        "django_version": "4.2.30",
+        "evidence": "Raw probe stdout and exit status retrieved from the sandbox filesystem.",
+        "outcome": "vulnerable",
+        "probe_sha256": "179c422469dd7855f1de6fe4275493e901feee92c702a64c61ceca5f93728754"
+      }
+    ],
+    "failures": [],
+    "install_ok": true,
+    "notes": "Built from raw sandbox files retrieved via the Files API.",
+    "patch_sha256": "4714dd7432f44428539231dfc6f5565eb147c708287c0d486f3bb0cdb119b9b3",
+    "python_version": "Python 3.12.3",
+    "source_commit": "554e82b8150f656e0de8ea55c6fbb80ba8a34579",
+    "suite": {
+      "errors": 0,
+      "failed": 0,
+      "passed": 25,
+      "skipped": 0
+    },
+    "test_command": "python manage.py test --verbosity 2 (JUnit via unittest-xml-reporting)",
+    "tests_exit_code": 0
+  },
+  "input_tokens": 26348,
+  "iterations": [
+    {
+      "environment_id": "2e2f2c29050d2094f656a60b6a4d2d41",
+      "files_changed": 9,
+      "interaction_id": "v1_Chc2bkxlYXBtWk5aamFfdU1QeThxYm1RYxIXNm5MZWFwbVpOWmphX3VNUHk4cWJtUWM",
+      "n": 1,
+      "report": {
+        "artifacts_verified": true,
+        "check": [],
+        "checks_exit_code": 0,
+        "deprecation_warnings": null,
+        "django_version": "5.2.18",
+        "evidence_source": "sandbox_artifacts",
+        "exploits": [
+          {
+            "benign_control_passed": true,
+            "blocked": true,
+            "cve": "CVE-2026-87975",
+            "django_version": "5.2.18",
+            "evidence": "Raw probe stdout and exit status retrieved from the sandbox filesystem.",
+            "outcome": "blocked",
+            "probe_sha256": "179c422469dd7855f1de6fe4275493e901feee92c702a64c61ceca5f93728754"
+          }
+        ],
+        "failures": [],
+        "install_ok": true,
+        "notes": "Built from raw sandbox files retrieved via the Files API.",
+        "patch_sha256": "66525cd980d677cb99ea95e709c269c84d0b63a160d028ecc4d800a3d4a5d824",
+        "python_version": "Python 3.12.3",
+        "source_commit": "554e82b8150f656e0de8ea55c6fbb80ba8a34579",
+        "suite": {
+          "errors": 0,
+          "failed": 0,
+          "passed": 25,
+          "skipped": 0
+        },
+        "test_command": "python manage.py test --verbosity 2 (JUnit via unittest-xml-reporting)",
+        "tests_exit_code": 0
+      },
+      "wall_seconds": 95.54325958300615
+    }
+  ],
+  "kind": "unpinned",
+  "output_tokens": 5625,
+  "pr_url": null,
+  "repo_url": "https://github.com/Jainparas99/jatayu-demo-app",
+  "review_blockers": [],
+  "run_id": "20261025-141628-unpinned-d39bc104",
+  "source_commit": "554e82b8150f656e0de8ea55c6fbb80ba8a34579",
+  "started_at": "2026-10-25T14:16:28",
+  "target_django": "5.2.18",
+  "wall_seconds": 411.7208407500002
+}

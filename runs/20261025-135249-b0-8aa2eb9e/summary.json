@@ -1,0 +1,56 @@
+{
+  "approved": false,
+  "baseline_report": null,
+  "input_tokens": null,
+  "iterations": [
+    {
+      "environment_id": null,
+      "files_changed": 1,
+      "interaction_id": "v1_ChdJMnplYXNPMUFxdU1fUFVQNDQ3ZHdBMBIXSTJ6ZWFzTzFBcXVNX1BVUDQ0N2R3QTA",
+      "n": 1,
+      "report": {
+        "artifacts_verified": false,
+        "check": [
+          "TypeError: 'class Meta' got invalid attribute(s): index_together"
+        ],
+        "checks_exit_code": 1,
+        "deprecation_warnings": 0,
+        "django_version": "5.2.18",
+        "evidence_source": "agent_summary",
+        "exploits": [],
+        "failures": [
+          {
+            "test": "django.setup (workboard.models.Card)",
+            "trace_head": "Traceback (most recent call last):\n  File \"/tmp/repo/manage.py\", line 11, in <module>\n    execute_from_command_line(sys.argv)\n  File \"/tmp/repo/.venv/lib/python3.12/site-packages/django/core/management/__init__.py\", line 442, in execute_from_command_line\n    utility.execute()\n  File \"/tmp/repo/.venv/lib/python3.12/site-packages/django/core/management/__init__.py\", line 416, in execute\n    django.setup()\n  File \"/tmp/repo/.venv/lib/python3.12/site-packages/django/__init__.py\", line 24, in setup\n    apps.populate(settings.INSTALLED_APPS)\n  File \"/tmp/repo/.venv/lib/python3.12/site-packages/django/apps/registry.py\", line 116, in populate\n    app_config.import_models()\n  File \"/tmp/repo/.venv/lib/python3.12/site-packages/django/apps/config.py\", line 269, in import_models\n    self.models_module = import_module(models_module_name)\n                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/importlib/__init__.py\", line 90, in import_module"
+          }
+        ],
+        "install_ok": true,
+        "notes": "Both `python manage.py test` and `python manage.py check` fail during `django.setup()` when importing `workboard.models.Card` with `TypeError: 'class Meta' got invalid attribute(s): index_together` (removed in Django 5.1). No approved target-specific security probes were supplied in the prompt, so `exploits` is reported as empty (incomplete security evidence).",
+        "patch_sha256": "1e6fa7ff73b0ca00395cadfda6c2c45299be564b3a0bc03ea94c83944406159e",
+        "python_version": "3.12.3",
+        "source_commit": "554e82b8150f656e0de8ea55c6fbb80ba8a34579",
+        "suite": {
+          "errors": 1,
+          "failed": 0,
+          "passed": 0,
+          "skipped": 0
+        },
+        "test_command": "python manage.py test",
+        "tests_exit_code": 1
+      },
+      "wall_seconds": 0.0
+    }
+  ],
+  "kind": "b0",
+  "output_tokens": null,
+  "pr_url": null,
+  "repo_url": "https://github.com/Jainparas99/jatayu-demo-app",
+  "review_blockers": [
+    "Baseline comparison only; not approved migration evidence."
+  ],
+  "run_id": "20261025-135249-b0-8aa2eb9e",
+  "source_commit": "554e82b8150f656e0de8ea55c6fbb80ba8a34579",
+  "started_at": "2026-10-25T13:52:49",
+  "target_django": "5.2.18",
+  "wall_seconds": 61.807626124995295
+}

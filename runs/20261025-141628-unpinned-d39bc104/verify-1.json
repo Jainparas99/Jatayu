@@ -1,0 +1,33 @@
+{
+  "artifacts_verified": true,
+  "check": [],
+  "checks_exit_code": 0,
+  "deprecation_warnings": null,
+  "django_version": "5.2.18",
+  "evidence_source": "sandbox_artifacts",
+  "exploits": [
+    {
+      "benign_control_passed": true,
+      "blocked": true,
+      "cve": "CVE-2026-87975",
+      "django_version": "5.2.18",
+      "evidence": "Raw probe stdout and exit status retrieved from the sandbox filesystem.",
+      "outcome": "blocked",
+      "probe_sha256": "179c422469dd7855f1de6fe4275493e901feee92c702a64c61ceca5f93728754"
+    }
+  ],
+  "failures": [],
+  "install_ok": true,
+  "notes": "Built from raw sandbox files retrieved via the Files API.",
+  "patch_sha256": "66525cd980d677cb99ea95e709c269c84d0b63a160d028ecc4d800a3d4a5d824",
+  "python_version": "Python 3.12.3",
+  "source_commit": "554e82b8150f656e0de8ea55c6fbb80ba8a34579",
+  "suite": {
+    "errors": 0,
+    "failed": 0,
+    "passed": 25,
+    "skipped": 0
+  },
+  "test_command": "python manage.py test --verbosity 2 (JUnit via unittest-xml-reporting)",
+  "tests_exit_code": 0
+}

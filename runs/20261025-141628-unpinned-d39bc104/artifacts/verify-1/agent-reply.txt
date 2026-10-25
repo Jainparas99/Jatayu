@@ -1,0 +1,1 @@
+{"harness_dir": "/jatayu", "script_exit": 0, "out_files": ["DONE", "check.exit", "check.stderr", "check.stdout", "clone.log", "django.txt", "head.txt", "install.exit", "install.log", "junit.xml", "probe.exit", "probe.sha256", "probe.stderr", "probe.stdout", "python.txt", "tests.exit", "tests.stderr", "tests.stdout"]}
