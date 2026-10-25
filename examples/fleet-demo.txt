@@ -1,0 +1,8 @@
+# Public Django projects for a live Fleet demo. Findings are whatever their manifests say
+# at scan time; none of this is a claim about the projects beyond their declared pins.
+# Run on your machine:  uv run jatayu fleet scan @examples/fleet-demo.txt --save
+https://github.com/spdx/spdx-online-tools        # main was on Django 4.2 per its Oct 2025 issue
+https://github.com/bcgov/gwells                  # open "Django Migration 4.2 to 5.2" ticket
+https://github.com/Young-Supernova-Experiment/YSE_PZ
+https://github.com/DanielGnzlzVll/AACX           # issue: Django 4.2.3 is end of life
+https://github.com/healthchecks/healthchecks     # control: current main is on Django 6
