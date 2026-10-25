@@ -1,42 +1,72 @@
 # Jatayu
 
-Framework migration tooling powered by Gemini 4 Argon, with independent verification and human review. Built for the Gemini 4 Argon SF Hackathon on October 25, 2026.
+**Find applications running on frameworks that no longer receive security fixes, upgrade them with Gemini 4 Argon, verify the result in a sandbox, and publish only with human approval.**
 
-Argon generates coordinated changes across a repository. Antigravity is intended to execute the verification loop, with recorded results and a reviewable patch before human approval. Django is the first ecosystem adapter; the adapter architecture is being extended for other stacks.
+Django 4.2 stopped receiving security patches on April 7, 2026. Every framework reaches the same point, and the fix is always the upgrade that touches every file. Jatayu turns that backlog item into a reviewable, evidence-backed change.
 
-**Current state:** local controller tests, strict raw-artifact parsers, and one purpose-built Django security regression fixture are implemented and tested. A completed Argon migration, independently verified cloud run, target application benchmark, and PR publication are still pending.
+| Capability | What it does | Status |
+|---|---|---|
+| **Fleet** | Reads dependency manifests and lock files across repositories and ranks every end-of-life framework and runtime, with file and line evidence | Available |
+| **Upgrade engine** | Gemini 4 Argon reads the whole repository plus the official upgrade notes in one context and writes every changed file in a single long-decode response | Django adapter wired; first verified run in progress |
+| **Verification** | An Antigravity managed agent installs the target version, runs the project's own tests and a frozen security probe, and returns raw artifacts; failures loop back to Argon | Artifact parsers and gates implemented; cloud run in progress |
+| **Review and approval** | Evidence, blockers and the patch SHA-256 on one page; nothing is published without explicit approval of that exact patch | Review implemented; PR publication disabled |
 
-## Run locally
+## How it works
 
-Requires Python 3.12 or newer and uv.
+```
+repositories ──► FLEET ──► ranked list of end-of-life frameworks and runtimes
+                                │  choose a target
+                                ▼
+                 PACK      whole repository + official upgrade notes
+                 PLAN      gemini-4-argon, thinking "high": every breaking change, cross-checked
+                 MIGRATE   gemini-4-argon, background long decode: all changed files in one response
+                 VERIFY    Antigravity sandbox: install, project tests, checks, security probe (raw artifacts)
+                 REPAIR    failures → Argon (previous_interaction_id) → re-verify, bounded attempts
+                 REVIEW    evidence gate + patch SHA-256 → human approval → pull request
+```
+
+Evidence rules are enforced in code, not by the model:
+
+- A security claim requires the same frozen probe to **succeed as an attack before** the upgrade and be **blocked after** it, with a benign control passing on both.
+- Empty test suites, skipped probes, timeouts and model-written summaries never count as passing.
+- Approval is bound to the SHA-256 of the reviewed patch. A different patch needs a new review.
+
+## Quick start
+
+Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 
 ```sh
 git clone https://github.com/Jainparas99/Jatayu.git
 cd Jatayu
 uv sync --locked
+cp .env.example .env          # set GEMINI_API_KEY
 make test lint
-uv run jatayu doctor
-uv run jatayu serve
+uv run jatayu doctor          # shows which credentials are configured (never their values)
+uv run jatayu ping            # one gemini-4-argon call
+uv run jatayu serve           # http://127.0.0.1:8000  (Runs)  and  /fleet  (Fleet)
 ```
 
-Open http://127.0.0.1:8000 for the evidence review page. With no saved migration runs, the page shows no evidence and keeps publication disabled.
+## Usage
 
-Copy `.env.example` to `.env` and configure `GEMINI_API_KEY` locally for provider testing. Run `make ping` to test access. Credentials belong in the local environment and are excluded from Git.
-
-Project settings use the `JATAYU_*` prefix shown in `.env.example`. The original settings prefix remains accepted for existing local setups. The internal Python module is `unpinned`; the public package and command are `jatayu`.
-
-## Prepare an input without API access
-
-The `prepare` command clones a public GitHub input, pins its source commit, selects
-which files to read, and saves a requested execution recipe under `runs/`. It does
-not install the target, execute its tests, fetch upgrade notes, or call a model.
+**Find end-of-life frameworks across repositories**
 
 ```sh
-uv run jatayu prepare https://github.com/OWNER/REPO --adapter django
+uv run jatayu fleet scan ./service-a https://github.com/OWNER/REPO --save
+uv run jatayu fleet scan @repos.txt --fail-on eol        # one target per line
 ```
 
-For another ecosystem, supply the framework, language, versions, commands and
-upgrade-note URLs explicitly:
+Fleet recognizes Django, Ruby on Rails, Spring Boot, Python and Node.js. Support dates come from [endoflife.date](https://endoflife.date); `uv run python -m unpinned.fleet refresh-eol` updates them.
+
+**Upgrade a repository**
+
+```sh
+uv run jatayu spike   https://github.com/OWNER/REPO                 # can the sandbox install and test it?
+uv run jatayu baseline https://github.com/OWNER/REPO --mode b0       # version bump only, for comparison
+uv run jatayu run     https://github.com/OWNER/REPO --adapter django
+uv run jatayu report                                                # results table from saved runs
+```
+
+**Prepare any repository (no API calls)**
 
 ```sh
 uv run jatayu prepare https://github.com/OWNER/REPO \
@@ -46,58 +76,72 @@ uv run jatayu prepare https://github.com/OWNER/REPO \
   --notes-url https://example.com/official-upgrade-notes
 ```
 
-Generic input preparation is available. Generic sandbox verification and completed
-migrations in other ecosystems remain unimplemented. Prepared recipes carry no
-verification or approval authority, and their runtime versions are requested inputs,
-not measured results. The live `run` command currently accepts `--adapter django`.
-Its baseline must have independently verified sandbox evidence before migration starts.
+Preparation clones the input, pins the source commit, selects files and saves an execution recipe under `runs/`. It does not install, test or call a model.
 
-## Reproduce the local security fixture
-
-Install Django 4.2.30 and 5.2.18 into separate Python 3.12 environments, then run:
+**Reproduce the security fixture**
 
 ```sh
-uv run jatayu prove-fixture /path/to/old-env/bin/python /path/to/new-env/bin/python
+uv run jatayu prove-fixture /path/to/django-4.2.30-env/bin/python /path/to/django-5.2.18-env/bin/python
 ```
 
-The unchanged HTTP test-client probe reproduces the editable-primary-key formset issue on 4.2.30 and blocks it on 5.2.18; a normal edit succeeds on both. Raw proof is saved under `runs/*-local-fixture-*/`.
+The unchanged probe reproduces CVE-2026-87975 (model formsets with editable primary keys) on 4.2.30 and is blocked on 5.2.18; a normal edit succeeds on both. Raw output is saved under `runs/`. This purpose-built fixture establishes only its own behavior, not exposure in any other application.
 
-This purpose-built, in-memory fixture establishes only its own behavior. It is not evidence of exposure in an arbitrary target repository, an Argon-generated migration, or a cloud benchmark.
+## Ecosystem support
 
-## Verification and approval
+| Adapter | Language | Fleet detection | Upgrade engine |
+|---|---|---|---|
+| Django | Python | Yes | Wired; first verified run in progress |
+| Ruby on Rails | Ruby | Yes | Roadmap |
+| Spring Boot | Java | Yes | Roadmap |
+| Generic | Any | — | Input preparation only |
 
-Raw artifact parsers check testcase records, process outcomes, probe hashes, and runtime versions. Parsing alone does not authenticate sandbox execution. See the [artifact parsing contract](src/unpinned/artifacts/README.md) and [security probe notes](security_tests/README.md).
+Everything ecosystem-specific lives in `src/unpinned/adapters/`: files to read, how to bump the version pin, upgrade-note sources, install/test/check commands and the rule-based baseline. Roadmap adapters cannot be selected for a run until a verified run exists.
 
-Independent cloud artifact retrieval and provenance remain incomplete. Model summaries cannot certify their own results. Publication stays unavailable until the verification and exact-patch approval flow is complete.
+## Security model
+
+- **Secrets:** read from the environment or the Gemini Credentials API at runtime; never committed, logged or placed in a model prompt.
+- **Sandbox network:** the verification agent may reach PyPI and GitHub only.
+- **Server access:** reads follow your hosting platform's access controls. Every state-changing request (scan, approve) requires `Authorization: Bearer $JATAYU_DASHBOARD_TOKEN`; without it the server is read-only.
+- **Inputs over HTTP:** Fleet accepts only public `https://github.com/owner/repo` URLs, never local paths.
+- **Model output:** generated patches are parsed with path checks that reject anything outside the repository, `.git/`, CI workflows, secrets files and independent security probes.
+
+## Deployment
+
+The deployable application is `unpinned.server:app` (Runs, Fleet and the review API). See [deploy/README.md](deploy/README.md) for Docker, Cloud Run (private by default) and the GitHub Action that flags end-of-life pins in pull requests.
+
+## Configuration
+
+| Variable | Purpose |
+|---|---|
+| `GEMINI_API_KEY` | Gemini API access |
+| `GITHUB_TOKEN` | Registered with the Credentials API for approved pull requests |
+| `JATAYU_FORK_OWNER` | Pull requests go only to forks owned by this account |
+| `JATAYU_TARGET_DJANGO`, `JATAYU_BASELINE_DJANGO` | Exact target and baseline versions |
+| `JATAYU_MAX_ITERATIONS` | Repair attempts (1–4) |
+| `JATAYU_DASHBOARD_TOKEN` | Enables write actions on a deployed server |
+
+The command is `jatayu`; the internal Python package is `unpinned`.
+
+## Limitations
+
+- Django is the only ecosystem with a wired upgrade path. Rails and Spring Boot are detected by Fleet but not yet upgradable.
+- A passing result means the project's own tests, framework checks and the security probe passed. It is only as strong as the project's test suite.
+- PR publication is disabled until the cloud verification and exact-patch approval flow is complete.
+- Run artifacts are stored on local disk; container deployments need persistent storage.
 
 ## Built today
 
-Claude Code supplied the initial scaffold and ecosystem adapter definitions. Codex repaired evidence gates, provider response handling, sandbox continuation, patch safety, and review behavior; added the owned security fixture, raw-artifact parsers, and regression tests; and prepared the Jatayu public branding. Gemini 4 Argon is the intended migration lead; Antigravity is the intended remote execution environment.
+Jatayu was built during the Gemini 4 Argon SF Hackathon (Cerebral Valley × Google DeepMind) on October 25, 2026. All code in this repository was written that day; the history starts at commit `bc0c942`.
 
-Commit range is pending the initial commit. No completed migration benchmark is claimed. A target repository, its license credit and immutable commit, comparable baseline results, live migration runtime, and model spend still need to be recorded.
+- **Upgrade pipeline:** packing, planning, long-decode migration, path-safe patch parsing, bounded repair loop (`src/unpinned/`)
+- **Verification:** Antigravity integration, raw-artifact parsers, evidence gate, patch review (`src/unpinned/verify/`, `artifacts/`, `evidence.py`, `review.py`)
+- **Security fixture:** CVE-2026-87975 probe with benign control (`security_tests/`)
+- **Ecosystem adapters:** Django, generic, Rails and Spring Boot roadmap (`src/unpinned/adapters/`)
+- **Fleet:** end-of-life catalog, manifest detection, ranking, CLI and dashboard (`src/unpinned/fleet/`, `static/fleet.html`)
+- **Server and deployment:** review API, Runs dashboard, write-token gate, Dockerfile, Cloud Run script, GitHub Action
+
+Third-party projects are used only as inputs and are credited where results are reported.
 
 ## License
 
-[MIT](LICENSE) — Copyright 2026 Paras Jain.
-
-
-## Runs and Fleet workspace
-
-`uv run jatayu serve` starts the shared server at `http://127.0.0.1:8000`:
-
-- **Runs** (`/`): saved run history, independent evidence status, blockers, full patch SHA-256,
-  diff inspection/download, and an approval button bound to the reviewed patch.
-- **Fleet** (`/fleet`): find unsupported framework/runtime pins. Also available as
-  `uv run jatayu fleet scan /path/to/repo --save`.
-- **Configuration** (in Runs): credential presence flags and safe execution defaults.
-  Credential values are never returned by this view.
-
-Set `JATAYU_DASHBOARD_TOKEN` in the server environment to allow write requests. The browser's
-password field keeps its token only in tab memory. The server validates it on each action.
-Reads require your hosting platform's access controls; see [deployment instructions](deploy/README.md).
-Use the existing Dockerfile and `unpinned.server:app` for deployment. Containers need persistent
-storage for durable run artifacts; Cloud Run's default filesystem is ephemeral.
-
-Migrations currently start from the CLI on the server. Browser launch and PR publication are
-unavailable. The approval button stays disabled until both evidence gates and publication support
-are ready. Local fixture proofs and model summaries never count as verified sandbox results.
+[MIT](LICENSE) © 2026 Paras Jain
