@@ -61,3 +61,26 @@ def test_usage_reads_installed_sdk_field_names():
         123,
         0,
     )
+
+
+def test_client_is_cached_and_not_garbage_collected(monkeypatch):
+    import sys
+    import types
+
+    from unpinned import gemini
+
+    created = []
+
+    class FakeClient:
+        def __init__(self, api_key):
+            created.append(api_key)
+
+    fake_genai = types.SimpleNamespace(Client=FakeClient)
+    monkeypatch.setitem(sys.modules, "google.genai", fake_genai)
+    monkeypatch.setitem(sys.modules, "google", types.SimpleNamespace(genai=fake_genai))
+    monkeypatch.setattr(gemini, "_CLIENT", None)
+    monkeypatch.setattr(
+        gemini, "settings", lambda: types.SimpleNamespace(gemini_api_key="test-key")
+    )
+    assert gemini.client() is gemini.client()
+    assert created == ["test-key"]

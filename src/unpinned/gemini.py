@@ -28,13 +28,27 @@ class Result:
     environment_id: str | None = None
 
 
-def client():
-    from google import genai  # imported lazily so tests run without the SDK configured
+_CLIENT = None
 
-    key = settings().gemini_api_key
-    if not key:
-        raise RuntimeError("Set GEMINI_API_KEY in the project .env before live Gemini execution.")
-    return genai.Client(api_key=key)
+
+def client():
+    """One shared client for the process.
+
+    A throwaway client (client().interactions.create(...)) is garbage-collected right away
+    and closes its HTTP connection mid-request: "Cannot send a request, as the client has
+    been closed." Keep a single reference instead.
+    """
+    global _CLIENT
+    if _CLIENT is None:
+        from google import genai  # imported lazily so tests run without the SDK configured
+
+        key = settings().gemini_api_key
+        if not key:
+            raise RuntimeError(
+                "Set GEMINI_API_KEY in the project .env before live Gemini execution."
+            )
+        _CLIENT = genai.Client(api_key=key)
+    return _CLIENT
 
 
 def _usage(interaction: Any) -> tuple[int | None, int | None]:
