@@ -68,7 +68,8 @@ def test_incomplete_run_cannot_publish_even_with_click(tmp_path, monkeypatch):
             started_at="now",
         ),
     )
-    client = TestClient(api.app)
+    monkeypatch.setenv("JATAYU_DASHBOARD_TOKEN", "review-test-token")
+    client = TestClient(api.app, headers={"Authorization": "Bearer review-test-token"})
     review = client.get("/api/runs/r/review")
     assert review.status_code == 200
     assert not review.json()["ready_for_review"]
