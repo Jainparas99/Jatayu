@@ -105,7 +105,17 @@ def run_loop(
     for n in range(1, s.max_iterations + 1):
         t0 = time.monotonic()
         report, res = verify(
-            summary.repo_url, summary.target_django, patch, source_commit=summary.source_commit
+            summary.repo_url,
+            summary.target_django,
+            patch,
+            source_commit=summary.source_commit,
+            artifact_dir=d / "artifacts" / f"verify-{n}",
+        )
+        print(
+            f"VERIFY {n}: {report.suite.passed} passed, {report.suite.failed} failed, "
+            f"{report.suite.errors} errors; evidence={report.evidence_source}; "
+            f"probe={[e.outcome for e in report.exploits]}",
+            flush=True,
         )
         it = Iteration(
             n=n,

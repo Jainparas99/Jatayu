@@ -150,7 +150,17 @@ def run(
     con.print(f"PACK  {len(bundle.files)} files, ~{bundle.approx_tokens:,} tokens")
     save_json(d / "bundle.json", {"sha256": bundle.sha256, "files": sorted(bundle.files)})
     summary.baseline_report, baseline_res = verify(
-        repo_url, s.baseline_django, None, source_commit=summary.source_commit
+        repo_url,
+        s.baseline_django,
+        None,
+        source_commit=summary.source_commit,
+        artifact_dir=d / "artifacts" / "baseline",
+    )
+    con.print(
+        f"BASELINE {s.baseline_django}: {summary.baseline_report.suite.passed} passed, "
+        f"{summary.baseline_report.suite.failed} failed, {summary.baseline_report.suite.errors} "
+        f"errors; evidence={summary.baseline_report.evidence_source}; "
+        f"probe={[e.outcome for e in summary.baseline_report.exploits]}"
     )
     save_json(d / "baseline.json", summary.baseline_report)
     save_text(d / "baseline.raw.txt", baseline_res.text)

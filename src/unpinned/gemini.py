@@ -145,8 +145,13 @@ def run_agent(
     previous_interaction_id: str | None = None,
     environment_id: str | None = None,
     background: bool = True,
+    sources: list[dict] | None = None,
 ) -> Result:
-    """Run the Antigravity managed agent (Argon inside a Google-hosted Linux sandbox)."""
+    """Run the Antigravity managed agent (Argon inside a Google-hosted Linux sandbox).
+
+    sources: files mounted into a NEW environment, e.g. {"type": "inline", "target": path,
+    "encoding": "base64", "content": ...}. Ignored when continuing an existing environment.
+    """
     if previous_interaction_id and not environment_id:
         raise ValueError("continuing a managed agent requires its environment_id")
     domains = SANDBOX_ALLOWLIST if allowlist is None else allowlist
@@ -162,6 +167,7 @@ def run_agent(
             "network": {"allowlist": [{"domain": domain} for domain in domains]}
             if domains
             else "disabled",
+            **({"sources": sources} if sources else {}),
         },
     }
     if previous_interaction_id:
@@ -172,6 +178,14 @@ def run_agent(
     if getattr(it, "status", None) in _PENDING:
         return wait(it.id)
     return _completed(_wrap(it))
+
+
+def download_file(environment_id: str, path: str) -> bytes:
+    """Raw bytes of a file in a managed-agent environment's snapshot (Files API)."""
+    data = client().environments.files.download(environment=environment_id, path=path)
+    if not isinstance(data, bytes | bytearray):
+        raise RuntimeError(f"unexpected download result for {path}")
+    return bytes(data)
 
 
 def register_github_token(token: str, name: str = "unpinned-github") -> Any:
