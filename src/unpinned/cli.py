@@ -54,31 +54,82 @@ def spike(
 
 
 @app.command()
+def prepare(
+    repo_url: str,
+    adapter: str = typer.Option("django", help="django | generic"),
+    source_version: str | None = typer.Option(None, "--from-version"),
+    target: str | None = typer.Option(None),
+    framework: str | None = typer.Option(None),
+    language: str | None = typer.Option(None),
+    test_cmd: str | None = typer.Option(None),
+    install_cmd: str | None = typer.Option(None),
+    check_cmd: str | None = typer.Option(None),
+    notes_url: list[str] | None = typer.Option(None, help="repeat for each upgrade-notes URL"),
+) -> None:
+    """Pin and inventory an input; save its recipe without running code or calling models."""
+    from .pack import pack
+    from .preparation import recipe, resolve_adapter, save_recipe
+
+    try:
+        selected, source, destination = resolve_adapter(
+            adapter,
+            source_version=source_version,
+            target_version=target,
+            framework=framework,
+            language=language,
+            test_command=test_cmd,
+            install_command=install_cmd,
+            check_command=check_cmd,
+            notes_urls=notes_url,
+        )
+        root = _clone(repo_url)
+        commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+        value = recipe(
+            selected, pack(root, adapter=selected), repo_url, commit, source, destination
+        )
+        directory = save_recipe(value)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    con.print(f"Prepared input: {directory / 'input.json'}")
+    con.print("Commands have not been run. This is not verified migration evidence.")
+
+
+@app.command()
 def run(
     repo_url: str,
     target: str | None = typer.Option(
         None, help="exact target Django version; defaults to settings"
     ),
     live: bool = typer.Option(False, help="small repo, thinking medium, no PLAN step"),
+    adapter: str = typer.Option("django", help="currently supported live adapter: django"),
 ) -> None:
     """Full pipeline: pack → plan → migrate → verify/fix loop. Ends at the Approve page."""
     from .loop import run_loop
     from .migrate import migrate
     from .models import RunSummary
-    from .notes import release_notes
+    from .notes import notes_for
     from .pack import pack
     from .plan import make_plan
-    from .repository import validate_django_version
+    from .preparation import recipe, resolve_adapter
     from .runs import new_run_id, run_dir, save_json, save_text
     from .verify.agent import verify
 
     s = settings()
-    validate_django_version(target or s.target_django)
+    if adapter != "django":
+        raise typer.BadParameter(
+            "Generic remote verification is not implemented. "
+            "Use `jatayu prepare --adapter generic` "
+            "to inspect its input and execution recipe without calling a model."
+        )
+    try:
+        selected, source, destination = resolve_adapter(adapter, target_version=target)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
     summary = RunSummary(
         run_id=new_run_id("unpinned"),
         kind="unpinned",
         repo_url=repo_url,
-        target_django=target or s.target_django,
+        target_django=destination,
         started_at=datetime.now().isoformat(timespec="seconds"),
     )
     d = run_dir(summary.run_id)
@@ -87,7 +138,11 @@ def run(
     summary.source_commit = subprocess.check_output(
         ["git", "rev-parse", "HEAD"], cwd=root, text=True
     ).strip()
-    bundle = pack(root)
+    bundle = pack(root, adapter=selected)
+    save_json(
+        d / "input.json",
+        recipe(selected, bundle, repo_url, summary.source_commit, source, destination),
+    )
     if bundle.skipped:
         raise ValueError(
             f"Input bundle omitted {len(bundle.skipped)} files; review before migration"
@@ -104,18 +159,38 @@ def run(
         or summary.baseline_report.suite.passed <= 0
         or summary.baseline_report.suite.failed
         or summary.baseline_report.suite.errors
+        or not summary.baseline_report.artifacts_verified
+        or summary.baseline_report.evidence_source != "sandbox_artifacts"
     ):
-        summary.review_blockers = ["Baseline application suite is not passing; migration stopped."]
+        summary.review_blockers = [
+            "Baseline suite or independent sandbox evidence is incomplete; migration stopped."
+        ]
         save_json(d / "summary.json", summary)
-        raise typer.BadParameter("Baseline application suite must pass before migration.")
-    notes = release_notes()
+        raise typer.BadParameter(
+            "A passing baseline with independently verified sandbox artifacts is required."
+        )
+    notes = notes_for(selected, source, destination)
     plan = None
     if not live:
-        plan, pres = make_plan(bundle, notes, to_v=summary.target_django)
+        plan, pres = make_plan(
+            bundle,
+            notes,
+            from_v=source,
+            to_v=destination,
+            framework=selected.framework,
+            language=selected.language,
+        )
         save_json(d / "plan.json", plan)
         con.print(f"PLAN  {len(plan.items)} breaking changes")
     patch, mres = migrate(
-        bundle, notes, plan, to_v=summary.target_django, thinking_level="medium" if live else "high"
+        bundle,
+        notes,
+        plan,
+        from_v=source,
+        to_v=destination,
+        thinking_level="medium" if live else "high",
+        framework=selected.framework,
+        language=selected.language,
     )
     save_text(d / "migrate.raw.txt", mres.text)
     summary.input_tokens, summary.output_tokens = mres.input_tokens, mres.output_tokens

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 import subprocess
 import time
 from datetime import datetime
@@ -14,16 +13,13 @@ from .parse import Patch
 from .runs import new_run_id, run_dir, save_json
 from .verify.agent import verify
 
-_PIN = re.compile(r"(?im)^\s*django\s*([<>=!~].*)?$")
-
 
 def bump_requirements(bundle: Bundle, target: str) -> Patch:
-    """B0: only change the Django pin in requirements files."""
-    p = Patch()
-    for path, content in bundle.files.items():
-        if path.endswith(".txt") and "requirements" in path and _PIN.search(content):
-            p.files[path] = _PIN.sub(f"Django=={target}", content)
-    return p
+    """Compatibility entry point for the first adapter's dependency-only baseline."""
+    from .adapters import get
+    from .preparation import bump_only
+
+    return bump_only(bundle, target, get("django"))
 
 
 def _record(kind: str, repo_url: str, patch: Patch, source_commit: str) -> RunSummary:

@@ -25,6 +25,33 @@ Copy `.env.example` to `.env` and configure `GEMINI_API_KEY` locally for provide
 
 Project settings use the `JATAYU_*` prefix shown in `.env.example`. The original settings prefix remains accepted for existing local setups. The internal Python module is `unpinned`; the public package and command are `jatayu`.
 
+## Prepare an input without API access
+
+The `prepare` command clones a public GitHub input, pins its source commit, selects
+which files to read, and saves a requested execution recipe under `runs/`. It does
+not install the target, execute its tests, fetch upgrade notes, or call a model.
+
+```sh
+uv run jatayu prepare https://github.com/OWNER/REPO --adapter django
+```
+
+For another ecosystem, supply the framework, language, versions, commands and
+upgrade-note URLs explicitly:
+
+```sh
+uv run jatayu prepare https://github.com/OWNER/REPO \
+  --adapter generic --framework FRAMEWORK --language LANGUAGE \
+  --from-version SOURCE_VERSION --target TARGET_VERSION \
+  --install-cmd "INSTALL_COMMAND" --test-cmd "TEST_COMMAND" \
+  --notes-url https://example.com/official-upgrade-notes
+```
+
+Generic input preparation is available. Generic sandbox verification and completed
+migrations in other ecosystems remain unimplemented. Prepared recipes carry no
+verification or approval authority, and their runtime versions are requested inputs,
+not measured results. The live `run` command currently accepts `--adapter django`.
+Its baseline must have independently verified sandbox evidence before migration starts.
+
 ## Reproduce the local security fixture
 
 Install Django 4.2.30 and 5.2.18 into separate Python 3.12 environments, then run:
