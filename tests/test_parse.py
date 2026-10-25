@@ -80,12 +80,10 @@ def test_unified_diff():
         "./",
         ".github/workflows",
         "security_tests/probe.py",
-        "app/tests/test_x.py",
-        "app/test_views.py",
         "a\x00.py",
     ],
 )
-def test_independent_tests_and_invalid_paths_are_protected(path):
+def test_security_probes_and_invalid_paths_are_protected(path):
     with pytest.raises(UnsafePath):
         check_path(path)
 
@@ -101,3 +99,30 @@ def test_rejected_and_truncated_patches_cannot_be_applied():
 def test_conflicting_write_and_delete_is_rejected():
     patch = parse("<<<FILE a.py>>>\nx\n<<<END FILE>>>\n<<<DELETE a.py>>>", {"a.py"})
     assert patch.rejected
+
+
+def test_upgrade_may_edit_tests_but_not_weaken_them():
+    original = (
+        "class T(TestCase):\n"
+        "    def test_a(self):\n        self.assertQuerysetEqual(q, [1])\n"
+        "    def test_b(self):\n        self.assertEqual(1, 1)\n"
+    )
+    renamed = original.replace("assertQuerysetEqual", "assertQuerySetEqual")
+    out = f"<<<FILE app/tests/test_m.py>>>\n{renamed}<<<END FILE>>>"
+    p = parse(out, {"app/tests/test_m.py": original})
+    assert p.files and not p.rejected
+
+    dropped = original.replace("    def test_b(self):\n        self.assertEqual(1, 1)\n", "")
+    skipped = original.replace("    def test_a", "    @unittest.skip('x')\n    def test_a")
+    no_assert = original.replace("self.assertEqual(1, 1)", "pass")
+    for bad, why in (
+        (dropped, "removes test methods"),
+        (skipped, "skip"),
+        (no_assert, "removes assertions"),
+    ):
+        out = f"<<<FILE app/tests/test_m.py>>>\n{bad}<<<END FILE>>>"
+        p = parse(out, {"app/tests/test_m.py": original})
+        assert not p.files and why in p.rejected[0][1]
+
+    p = parse("<<<DELETE app/tests/test_m.py>>>", {"app/tests/test_m.py": original})
+    assert not p.deletes and "deleting a test file" in p.rejected[0][1]

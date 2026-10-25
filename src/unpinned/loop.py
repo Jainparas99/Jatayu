@@ -96,7 +96,7 @@ def run_loop(
     summary: RunSummary,
     patch: Patch,
     migrate_interaction_id: str,
-    known_files: set[str],
+    known_files: dict[str, str],
 ) -> tuple[RunSummary, Patch]:
     s = settings()
     d = run_dir(summary.run_id)
@@ -133,10 +133,16 @@ def run_loop(
             summary.review_blockers.append("verified patch digest does not match current patch")
         if report.django_version != summary.target_django:
             summary.review_blockers.append("verified Django version differs from the exact target")
+        baseline_total = summary.baseline_report.suite.total if summary.baseline_report else 0
+        if report.suite.total < baseline_total:
+            summary.review_blockers.append(
+                f"suite shrank: {report.suite.total} tests ran vs {baseline_total} at baseline"
+            )
         save_json(d / "summary.json", summary)
         if not summary.review_blockers or n == s.max_iterations or not report.artifacts_verified:
             break
-        update, res = fix(failures_text(report), last_id, known_files | set(patch.files))
+        known = {**{q: "" for q in patch.files}, **dict(known_files)}
+        update, res = fix(failures_text(report), last_id, known)
         last_id = res.id
         patch = merge(patch, update)
     return summary, patch

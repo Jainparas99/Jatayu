@@ -5,8 +5,8 @@ import json
 import tarfile
 
 import pytest
-from unpinned.parse import Patch
 
+from unpinned.parse import Patch
 from unpinned.verify import harness
 from unpinned.verify.agent import _prefixes
 

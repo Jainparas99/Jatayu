@@ -208,7 +208,7 @@ def run(
         f"MIGRATE {len(patch.files)} files, {len(patch.rejected)} rejected, "
         f"truncated={patch.truncated}"
     )
-    summary, patch = run_loop(summary, patch, mres.id, set(bundle.files))
+    summary, patch = run_loop(summary, patch, mres.id, bundle.files)
     summary.wall_seconds = time.monotonic() - t0
     save_json(d / "summary.json", summary)
     save_json(

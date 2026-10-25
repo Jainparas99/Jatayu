@@ -37,10 +37,10 @@ def migrate(
         background=True,
         max_output_tokens=settings().max_output_tokens,
     )
-    return parse(res.text, known_files=set(bundle.files)), res
+    return parse(res.text, known_files=bundle.files), res
 
 
-def fix(failures_text: str, previous_interaction_id: str, known: set[str], to_v: str = "5.2"):
+def fix(failures_text: str, previous_interaction_id: str, known: dict[str, str], to_v: str = "5.2"):
     """Fix-loop turn: server-side state via previous_interaction_id."""
     res = gemini.ask(
         load("fix", to_version=to_v, failures=failures_text),

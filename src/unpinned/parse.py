@@ -47,25 +47,57 @@ def check_path(path: str) -> str:
         or any(norm.startswith(f) for f in FORBIDDEN_PREFIXES)
     ):
         raise UnsafePath("protected path")
-    if (
-        "security_tests" in parts
-        or any(part.lower() in {"tests", "test"} for part in parts[:-1])
-        or PurePosixPath(norm).name.startswith("test_")
-        or PurePosixPath(norm).name in {"tests.py", "conftest.py"}
-    ):
-        raise UnsafePath("independent tests are protected")
+    if "security_tests" in parts:
+        raise UnsafePath("independent security probes are protected")
     name = PurePosixPath(norm).name
     if name in SECRET_NAMES or name.startswith(".env"):
         raise UnsafePath("secrets file")
     return norm
 
 
-def parse(output: str, known_files: set[str] | None = None) -> Patch:
+_SKIP_MARKERS = re.compile(
+    r"@(?:unittest\.)?skip|\.skipTest\(|expectedFailure|pytest\.mark\.(?:skip|xfail)"
+    r"|\bskipIf\b|\bskipUnless\b"
+)
+_TEST_DEF = re.compile(r"^\s*(?:async\s+)?def\s+test", re.M)
+_ASSERT = re.compile(r"\bassert", re.I)
+
+
+def is_test_file(path: str) -> bool:
+    pp = PurePosixPath(path)
+    return (
+        any(part.lower() in {"tests", "test"} for part in pp.parts[:-1])
+        or pp.name.startswith("test_")
+        or pp.name in {"tests.py", "conftest.py"}
+    )
+
+
+def weakening_reason(original: str | None, new: str | None) -> str | None:
+    """Why an edit to a test file weakens the suite, or None if it doesn't.
+
+    Upgrades legitimately edit tests (renamed assertion helpers, removed settings in
+    override_settings). They may not drop tests, drop assertions, or add skips.
+    """
+    if new is None:
+        return "deleting a test file is not allowed"
+    before = original or ""
+    if len(_TEST_DEF.findall(new)) < len(_TEST_DEF.findall(before)):
+        return "removes test methods"
+    if len(_SKIP_MARKERS.findall(new)) > len(_SKIP_MARKERS.findall(before)):
+        return "adds skip or expected-failure markers"
+    if len(_ASSERT.findall(new)) < len(_ASSERT.findall(before)):
+        return "removes assertions"
+    return None
+
+
+def parse(output: str, known_files: set[str] | dict[str, str] | None = None) -> Patch:
     """Parse FILE/DELETE/SUMMARY blocks.
 
     known_files: paths in the input bundle. A FILE not in it is accepted only if the
-    SUMMARY lists it (as a new file).
+    SUMMARY lists it (as a new file). When it is a dict of original contents, edits to
+    test files are also checked so they cannot weaken the suite.
     """
+    originals = known_files if isinstance(known_files, dict) else None
     patch = Patch()
     if m := SUMMARY_RE.search(output):
         for line in m.group("body").splitlines():
@@ -87,7 +119,12 @@ def parse(output: str, known_files: set[str] | None = None) -> Patch:
         if path in patch.files:
             patch.rejected.append((path, "duplicate FILE block"))
             continue
-        patch.files[path] = m.group("body") + "\n"
+        body = m.group("body") + "\n"
+        if originals is not None and is_test_file(path):
+            if reason := weakening_reason(originals.get(path), body):
+                patch.rejected.append((path, f"test weakening: {reason}"))
+                continue
+        patch.files[path] = body
     # An opened FILE block without its END marker means the decode was cut off.
     patch.truncated = output.count("<<<FILE ") > output.count("<<<END FILE>>>")
 
@@ -99,6 +136,8 @@ def parse(output: str, known_files: set[str] | None = None) -> Patch:
                 raise UnsafePath("cannot delete a file absent from the input bundle")
             if path in patch.files or path in patch.deletes:
                 raise UnsafePath("conflicting or duplicate deletion")
+            if is_test_file(path):
+                raise UnsafePath("test weakening: deleting a test file is not allowed")
             patch.deletes.append(path)
         except UnsafePath as e:
             patch.rejected.append((raw, str(e)))

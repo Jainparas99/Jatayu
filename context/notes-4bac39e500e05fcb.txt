@@ -1,0 +1,625 @@
+
+
+    Django 5.1 release notes | Django documentation | Django
+
+      This document is for an insecure version of Django that is no longer supported. Please upgrade to a newer release!
+
+    Skip to main content
+
+    Django
+    The web framework for perfectionists with deadlines.
+
+      Menu
+
+      Main navigation
+
+          Overview
+
+          Download
+
+          Documentation
+
+          News
+
+          Code
+
+          Issues
+
+          Community
+
+          Foundation
+
+          &#9829; Donate
+
+          Sponsor
+
+    Search
+
+      Search
+
+  Toggle theme (current theme: auto)
+  Toggle theme (current theme: light)
+  Toggle theme (current theme: dark)
+
+  Toggle Light / Dark / Auto color theme
+
+  Documentation
+
+          Getting Help
+
+        Language: en
+
+            zh-hans
+
+            pt-br
+
+            pl
+
+            ko
+
+            ja
+
+            it
+
+            id
+
+            fr
+
+            es
+
+            el
+
+        Documentation version:
+          5.1
+
+            dev
+
+            6.1
+
+            6.0
+
+            5.2
+
+Django 5.1 release notes¶
+August 7, 2024
+Welcome to Django 5.1!
+These release notes cover the new features, as well as
+some backwards incompatible changes you
+should be aware of when upgrading from Django 5.0 or earlier. We’ve
+begun the deprecation process for some features.
+See the How to upgrade Django to a newer version guide if you’re updating an existing
+project.
+
+Python compatibility¶
+Django 5.1 supports Python 3.10, 3.11, 3.12, and 3.13 (as of 5.1.3). We
+highly recommend and only officially support the latest release of each
+series.
+
+What’s new in Django 5.1¶
+
+{% querystring %} template tag¶
+Django 5.1 introduces the {% querystring %} template
+tag, simplifying the modification of query parameters in URLs, making it easier
+to generate links that maintain existing query parameters while adding or
+changing specific ones.
+For instance, navigating pagination and query strings in templates can be
+cumbersome. Consider this template fragment that dynamically generates a URL
+for navigating to the next page within a paginated view:
+{# Linebreaks added for readability, this should be one, long line. #}
+&lt;a href=&quot;?{% for key, values in request.GET.iterlists %}
+  {% if key != &quot;page&quot; %}
+    {% for value in values %}
+      {{ key }}={{ value }}&amp;amp;
+    {% endfor %}
+  {% endif %}
+{% endfor %}page={{ page.next_page_number }}&quot;&gt;Next page&lt;/a&gt;
+
+When switching to using this new template tag, the above magically becomes:
+&lt;a href=&quot;{% querystring page=page.next_page_number %}&quot;&gt;Next page&lt;/a&gt;
+
+PostgreSQL Connection Pools¶
+Django 5.1 also introduces connection pool support for
+PostgreSQL. As the time to establish a new connection can be relatively long,
+keeping connections open can reduce latency.
+To use a connection pool with psycopg, you can set the &quot;pool&quot; option
+inside OPTIONS to be a dict to be passed to
+ConnectionPool, or to True to use the
+ConnectionPool defaults:
+DATABASES = {
+    &quot;default&quot;: {
+        &quot;ENGINE&quot;: &quot;django.db.backends.postgresql&quot;,
+        # ...
+        &quot;OPTIONS&quot;: {
+            &quot;pool&quot;: {
+                &quot;min_size&quot;: 2,
+                &quot;max_size&quot;: 4,
+                &quot;timeout&quot;: 10,
+            }
+        },
+    },
+}
+
+Middleware to require authentication by default¶
+The new LoginRequiredMiddleware
+redirects all unauthenticated requests to a login page. Views can allow
+unauthenticated requests by using the new
+login_not_required() decorator.
+LoginRequiredMiddleware respects the login_url and
+redirect_field_name values set via the
+login_required() decorator, but does not
+support setting login_url or redirect_field_name via the
+LoginRequiredMixin.
+To enable this, add &quot;django.contrib.auth.middleware.LoginRequiredMiddleware&quot;
+to your MIDDLEWARE setting.
+
+Minor features¶
+
+django.contrib.admin¶
+
+ModelAdmin.list_display now supports using __ lookups to list
+fields from related models.
+
+django.contrib.auth¶
+
+The default iteration count for the PBKDF2 password hasher is increased from
+720,000 to 870,000.
+The default parallelism of the ScryptPasswordHasher is
+increased from 1 to 5, to follow OWASP recommendations.
+The new AdminUserCreationForm and
+the existing AdminPasswordChangeForm now
+support disabling password-based authentication by setting an unusable
+password on form save. This is now available in the admin when visiting the
+user creation and password change pages.
+login_required(),
+permission_required(), and
+user_passes_test() decorators now
+support wrapping asynchronous view functions.
+ReadOnlyPasswordHashWidget now includes a button to reset the user’s
+password, which replaces the link previously embedded in the
+ReadOnlyPasswordHashField’s help text, improving the overall
+accessibility of the
+UserChangeForm.
+
+django.contrib.gis¶
+
+BoundingCircle is now
+supported on SpatiaLite 5.1+.
+Collect is now supported on MySQL
+8.0.24+.
+GeoIP2 now allows querying using
+ipaddress.IPv4Address or ipaddress.IPv6Address objects.
+GeoIP2.country() now exposes the continent_code,
+continent_name, and is_in_european_union values.
+GeoIP2.city() now exposes the accuracy_radius and region_name
+values. In addition, the dma_code and region values are now exposed
+as metro_code and region_code, but the previous keys are also
+retained for backward compatibility.
+Area now supports the ha unit.
+The new OGRGeometry.is_3d attribute allows checking if a geometry
+has a Z coordinate dimension.
+The new OGRGeometry.set_3d() method allows addition and removal of the
+Z coordinate dimension.
+OGRGeometry,
+Point,
+LineString,
+Polygon, and
+GeometryCollection and its subclasses now
+support measured geometries via the new OGRGeometry.is_measured and
+m properties, and the OGRGeometry.set_measured() method.
+OGRGeometry.centroid is now available on all supported geometry
+types.
+FromWKB() and
+FromWKT() functions
+now support the optional srid argument (except for Oracle where it is
+ignored).
+
+django.contrib.postgres¶
+
+BTreeIndex now supports the
+deduplicate_items parameter.
+
+django.contrib.sessions¶
+
+django.contrib.sessions.backends.cached_db.SessionStore now handles
+exceptions when storing session information in the cache, logging proper
+error messages with their traceback via the newly added
+sessions logger.
+django.contrib.sessions.backends.base.SessionBase and all built-in
+session engines now provide async API. The new asynchronous methods all have
+a prefixed names, e.g. aget(), akeys(), or acycle_key().
+
+Database backends¶
+
+&quot;init_command&quot; option is now supported in OPTIONS on SQLite
+to allow specifying pragma options to set upon
+connection.
+&quot;transaction_mode&quot; option is now supported in OPTIONS on
+SQLite to allow specifying the Transactions behavior.
+&quot;pool&quot; option is now supported in OPTIONS on PostgreSQL to
+allow using connection pools.
+
+Error Reporting¶
+
+In order to improve accessibility, the technical 404 and 500 error pages now
+use HTML landmark elements for the header, footer, and main content areas.
+
+File Storage¶
+
+The allow_overwrite
+parameter of FileSystemStorage now allows
+saving new files over existing ones.
+
+Forms¶
+
+In order to improve accessibility and enable screen readers to associate
+fieldsets with their help text, the form fieldset now includes the
+aria-describedby HTML attribute.
+
+Management Commands¶
+
+The makemigrations command now displays meaningful symbols for
+each operation to highlight operation categories.
+
+Migrations¶
+
+The new Operation.category attribute allows specifying an
+operation category used by the
+makemigrations to display a meaningful symbol for the operation.
+
+Models¶
+
+QuerySet.explain() now supports the generic_plan option on
+PostgreSQL 16+.
+RowRange now accepts positive integers
+for the start argument and negative integers for the end argument.
+The new exclusion argument of
+RowRange and
+ValueRange allows excluding rows,
+groups, and ties from the window frames.
+QuerySet.order_by() now supports ordering by annotation transforms
+such as JSONObject keys and ArrayAgg indices.
+F() and OuterRef() expressions that output
+CharField, EmailField,
+SlugField, URLField,
+TextField, or
+ArrayField can now be sliced.
+The new from_queryset argument of Model.refresh_from_db() and
+Model.arefresh_from_db()  allows customizing the queryset used to
+reload a model’s value. This can be used to lock the row before reloading or
+to select related objects.
+The new Expression.constraint_validation_compatible attribute allows
+specifying that the expression should be ignored during a constraint
+validation.
+
+Templates¶
+
+Custom tags may now set extra data on the Parser object that will later
+be made available on the Template instance. Such data may be used, for
+example, by the template loader, or other template clients.
+Template engines now implement a check() method
+that is already registered with the check framework.
+
+Tests¶
+
+assertContains(),
+assertNotContains(), and
+assertInHTML() assertions now add haystacks
+to assertion error messages.
+The RequestFactory,
+AsyncRequestFactory, Client, and
+AsyncClient classes now support the query_params
+parameter, which accepts a dictionary of query string keys and values. This
+allows setting query strings on any HTTP methods more easily.
+self.client.post(&quot;/items/1&quot;, query_params={&quot;action&quot;: &quot;delete&quot;})
+await self.async_client.post(&quot;/items/1&quot;, query_params={&quot;action&quot;: &quot;delete&quot;})
+
+The new SimpleTestCase.assertNotInHTML() assertion allows testing that
+an HTML fragment is not contained in the given HTML haystack.
+In order to enforce test isolation, database connections inside threads are
+no longer allowed in SimpleTestCase.
+
+Validators¶
+
+The new DomainNameValidator validates domain
+names, including internationalized domain names. The new
+validate_domain_name() function returns an
+instance of DomainNameValidator.
+
+Backwards incompatible changes in 5.1¶
+
+django.contrib.gis¶
+
+Support for PostGIS 2.5 is removed.
+Support for PROJ &lt; 6 is removed.
+Support for GDAL 2.4 is removed.
+GeoIP2 no longer opens both city and
+country databases when a directory path is provided, preferring the city
+database, if it is available. The country database is a subset of the city
+database and both are not typically needed. If you require use of the country
+database when in the same directory as the city database, explicitly pass the
+country database path to the constructor.
+
+Dropped support for MariaDB 10.4¶
+Upstream support for MariaDB 10.4 ends in June 2024. Django 5.1 supports
+MariaDB 10.5 and higher.
+
+Dropped support for PostgreSQL 12¶
+Upstream support for PostgreSQL 12 ends in November 2024. Django 5.1 supports
+PostgreSQL 13 and higher.
+
+Miscellaneous¶
+
+In order to improve accessibility, the admin’s changelist filter is now
+rendered in a &lt;nav&gt; tag instead of a &lt;div&gt;.
+In order to improve accessibility, the admin’s footer is now rendered in
+a &lt;footer&gt; tag instead of a &lt;div&gt;, and also moved below the
+&lt;div id=&quot;main&quot;&gt; element.
+In order to improve accessibility, the expandable widget used for
+ModelAdmin.fieldsets and
+InlineModelAdmin.fieldsets,
+when the fieldset has a name and use the collapse class, now includes
+&lt;details&gt; and &lt;summary&gt; elements.
+The JavaScript file collapse.js is removed since it is no longer needed
+in the Django admin site.
+SimpleTestCase.assertURLEqual() and
+assertInHTML() now add &quot;: &quot; to the
+msg_prefix. This is consistent with the behavior of other assertions.
+django.utils.text.Truncator used by truncatechars_html and
+truncatewords_html template filters now uses
+html.parser.HTMLParser subclasses. This results in a more robust
+and faster operation, but there may be small differences in the output.
+The undocumented django.urls.converters.get_converter() function is
+removed.
+The minimum supported version of SQLite is increased from 3.27.0 to 3.31.0.
+FileField now raises a
+FieldError when saving a file without a
+name.
+ImageField.update_dimension_fields(force=True) is no longer called after
+saving the image to storage. If your storage backend resizes images, the
+width_field and height_field will not match the width and height of
+the image.
+The minimum supported version of asgiref is increased from 3.7.0 to
+3.8.1.
+To improve performance, the delete_selected admin action now uses
+QuerySet.bulk_create() when creating multiple LogEntry objects. As a
+result, pre_save and post_save signals for LogEntry are not sent
+when multiple objects are deleted via this admin action.
+
+Features deprecated in 5.1¶
+
+Miscellaneous¶
+
+The ModelAdmin.log_deletion() and LogEntryManager.log_action()
+methods are deprecated. Subclasses should implement
+ModelAdmin.log_deletions() and  LogEntryManager.log_actions()
+instead.
+The undocumented django.utils.itercompat.is_iterable() function and the
+django.utils.itercompat module are deprecated. Use
+isinstance(..., collections.abc.Iterable) instead.
+The django.contrib.gis.geoip2.GeoIP2.coords() method is deprecated. Use
+django.contrib.gis.geoip2.GeoIP2.lon_lat() instead.
+The django.contrib.gis.geoip2.GeoIP2.open() method is deprecated. Use the
+GeoIP2 constructor instead.
+Passing positional arguments to Model.save() and Model.asave()
+is deprecated in favor of keyword-only arguments.
+Setting django.contrib.gis.gdal.OGRGeometry.coord_dim is deprecated. Use
+set_3d() instead.
+Overriding existing converters with django.urls.register_converter() is
+deprecated.
+The check keyword argument of CheckConstraint is deprecated in favor
+of condition.
+The undocumented OS_OPEN_FLAGS property of
+FileSystemStorage is deprecated. To allow
+overwriting files in storage, set the new
+allow_overwrite option
+to True instead.
+The get_cache_name() method of FieldCacheMixin is deprecated in favor
+of the cache_name cached property.
+
+Features removed in 5.1¶
+These features have reached the end of their deprecation cycle and are removed
+in Django 5.1.
+See Features deprecated in 4.2 for details on these changes, including how
+to remove usage of these features.
+
+The BaseUserManager.make_random_password() method is removed.
+The model’s Meta.index_together option is removed.
+The length_is template filter is removed.
+The django.contrib.auth.hashers.SHA1PasswordHasher,
+django.contrib.auth.hashers.UnsaltedSHA1PasswordHasher, and
+django.contrib.auth.hashers.UnsaltedMD5PasswordHasher are removed.
+The model django.contrib.postgres.fields.CICharField,
+django.contrib.postgres.fields.CIEmailField, and
+django.contrib.postgres.fields.CITextField are removed, except for
+support in historical migrations.
+The django.contrib.postgres.fields.CIText mixin is removed.
+The map_width and map_height attributes of BaseGeometryWidget are
+removed.
+The SimpleTestCase.assertFormsetError() method is removed.
+The TransactionTestCase.assertQuerysetEqual() method is removed.
+Support for passing encoded JSON string literals to JSONField and
+associated lookups and expressions is removed.
+Support for passing positional arguments to Signer and
+TimestampSigner is removed.
+The DEFAULT_FILE_STORAGE and STATICFILES_STORAGE settings is removed.
+The django.core.files.storage.get_storage_class() function is removed.
+
+      Previous page and next page
+
+         Django 5.1.1 release notes
+
+        Django 5.0.14 release notes 
+
+         Back to Top
+
+    Additional Information
+
+    Support Django!
+
+          pyup.io donated to the Django Software Foundation to support Django development. Donate today!
+
+      Contents
+
+Django 5.1 release notes
+Python compatibility
+What’s new in Django 5.1
+{% querystring %} template tag
+PostgreSQL Connection Pools
+Middleware to require authentication by default
+Minor features
+django.contrib.admin
+django.contrib.auth
+django.contrib.gis
+django.contrib.postgres
+django.contrib.sessions
+Database backends
+Error Reporting
+File Storage
+Forms
+Management Commands
+Migrations
+Models
+Templates
+Tests
+Validators
+
+Backwards incompatible changes in 5.1
+django.contrib.gis
+Dropped support for MariaDB 10.4
+Dropped support for PostgreSQL 12
+Miscellaneous
+
+Features deprecated in 5.1
+Miscellaneous
+
+Features removed in 5.1
+
+        Browse
+
+              Prev: Django 5.1.1 release notes
+
+              Next: Django 5.0.14 release notes
+
+            Table of contents
+
+              General Index
+
+              Python Module Index
+
+        You are here:
+
+            Django 5.1 documentation
+
+              Release notes
+
+            Django 5.1 release notes
+
+        Getting help
+
+          FAQ
+          Try the FAQ — it's got answers to many common questions.
+
+          Index, Module Index, or Table of Contents
+          Handy when looking for specific information.
+
+          Django Discord Server
+          Join the Django Discord Community.
+
+          Official Django Forum
+          Join the community on the Django Forum.
+
+          Ticket tracker
+          Report bugs with Django or Django documentation in our ticket tracker.
+
+        Download:
+
+          Offline (Django 5.1):
+          HTML |
+          PDF |
+          ePub
+
+            Provided by Read the Docs.
+
+    Sponsored Fellow, Diamond and Platinum Members
+
+            Sentry
+
+              Monitor your Django Code
+Resolve performance bottlenecks and errors using monitoring, replays, logs and Seer an AI agent for debugging.
+
+            JetBrains
+
+              JetBrains delivers intelligent software solutions that make developers more productive by simplifying their challenging tasks, automating the routine, and helping them adopt the best development practices. PyCharm is the Python IDE for Professional Developers by JetBrains providing a complete set of tools for productive Python, Web and scientific development.
+
+            Kraken Tech
+
+              Kraken is the most-loved operating system for energy. Powered by our Utility-Grade AI™ and deep industry know-how, we help utilities transform their technology and operations so they can lead the energy transition. Delivering better outcomes from generation through distribution to supply, Kraken powers 70+ million accounts worldwide, and is on a mission to make a big, green dent in the universe.
+
+            PostHog
+
+              PostHog is an all-in-one developer platform for building successful products. We provide product analytics, web analytics, session replay, error tracking, feature flags, experiments, surveys, LLM observability, data warehouse, CDP, workflows, logs, and an AI product assistant to help debug your code, ship features faster, and keep all your usage and customer data in one stack.
+
+      Become a sponsor
+
+      Django Links
+
+          Learn More
+
+            About Django
+
+            Getting Started with Django
+            Team Organization
+            Django Software Foundation
+            Code of Conduct
+            Diversity Statement
+
+          Get Involved
+
+            Join a Group
+            Contribute
+              to Django
+            Submit
+              a Bug
+            Report
+              a Security Issue
+            Individual membership
+
+          Get Help
+
+            Getting Help FAQ
+
+            Django Discord
+            Official Django Forum
+
+          Follow Us
+
+            GitHub
+            X
+            Fediverse (Mastodon)
+            Bluesky
+            LinkedIn
+            News RSS
+
+          Support Us
+
+            Sponsor Django
+            Donate to Django
+            Corporate membership
+            Official merchandise store
+            Benevity Workplace Giving Program
+            GitHub Sponsors
+
+        Django
+
+          Hosting by In-kind
+            donors
+
+        Design by Threespot
+          &amp; andrevv
+
+      &copy; 2005-2026
+         Django Software
+          Foundation and individual contributors. Django is a
+        registered
+          trademark of the Django Software Foundation.
+
