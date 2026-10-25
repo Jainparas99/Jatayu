@@ -45,3 +45,9 @@ def test_spring_reports_commercial_support_separately():
 
 def test_unknown_release():
     assert status_for("django", "9.9", TODAY).status == "unknown"
+
+
+def test_ruby_31_is_eol_and_points_to_newest_mature_release():
+    s = status_for("ruby", "3.1.4", TODAY)
+    assert s.status == "eol" and s.eol == "2025-03-26"
+    assert s.recommended == "4.0"

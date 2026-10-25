@@ -24,6 +24,8 @@ SANDBOX_ALLOWLIST = [
     "api.github.com",
     "codeload.github.com",
 ]
+# Approved by the project owner on 2026-10-25 for generic (non-Django) runs only.
+GENERIC_EXTRA_DOMAINS = ["registry.npmjs.org"]
 
 
 @dataclass(frozen=True)

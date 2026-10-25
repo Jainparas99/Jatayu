@@ -19,7 +19,7 @@ MAX_DEPTH = 3  # monorepos: look a few levels down, not through the whole tree
 
 @dataclass(frozen=True)
 class Finding:
-    product: str  # catalog key: django, rails, spring-boot, python, nodejs
+    product: str  # catalog key: django, rails, spring-boot, python, nodejs, ruby
     version: str
     source: str  # relative path
     line: int
@@ -105,6 +105,31 @@ _GEMLOCK = re.compile(r"^\s{4}rails \(" + _VER + r"\)")
 _GEMFILE = re.compile(r"""^\s*gem\s+["']rails["']\s*,\s*["'][~>=<\s]*""" + _VER)
 
 
+_RUBY_VERSION_FILE = re.compile(r"^\s*(?:ruby-)?" + _VER + r"\s*$")
+_GEMFILE_RUBY = re.compile(r"""^\s*ruby\s+["']\s*[~>=<]*\s*""" + _VER)
+_GEMSPEC_RUBY = re.compile(r"""required_ruby_version\s*=\s*["'][~>=<\s]*""" + _VER)
+_TOOL_VERSIONS_RUBY = re.compile(r"^\s*ruby\s+" + _VER)
+_FROM_RUBY = re.compile(r"(?i)^\s*FROM\s+(?:\S+/)?ruby:" + _VER)
+
+
+def _ruby_runtime(f: Path, rel: str) -> list[Finding]:
+    """Ruby interpreter versions: pinned files beat declared minimums."""
+    table = {
+        ".ruby-version": (_RUBY_VERSION_FILE, "pinned"),
+        ".tool-versions": (_TOOL_VERSIONS_RUBY, "pinned"),
+        "Gemfile": (_GEMFILE_RUBY, "pinned"),
+    }
+    pat, conf = table.get(f.name, (None, None))
+    if pat is None and f.name.endswith(".gemspec"):
+        pat, conf = _GEMSPEC_RUBY, "declared"
+    if pat is None:
+        return []
+    for i, line in enumerate(_lines(f), 1):
+        if m := pat.search(line):
+            return [Finding("ruby", m.group(1), rel, i, conf)]  # type: ignore[arg-type]
+    return []
+
+
 def _ruby(f: Path, rel: str) -> list[Finding]:
     out = []
     pat, conf = {
@@ -173,6 +198,8 @@ def _docker(f: Path, rel: str) -> list[Finding]:
             out.append(Finding("python", m.group(1), rel, i, "pinned"))
         elif m := _FROM_NODE.search(line):
             out.append(Finding("nodejs", m.group(1), rel, i, "pinned"))
+        elif m := _FROM_RUBY.search(line):
+            out.append(Finding("ruby", m.group(1), rel, i, "pinned"))
     return out
 
 
@@ -182,7 +209,8 @@ def detect(root: Path) -> list[Finding]:
     raw: list[Finding] = []
     for f in _files(root):
         rel = f.relative_to(root).as_posix()
-        raw += _python(root, f, rel) + _ruby(f, rel) + _java(f, rel) + _node(f, rel)
+        raw += _python(root, f, rel) + _ruby(f, rel) + _ruby_runtime(f, rel)
+        raw += _java(f, rel) + _node(f, rel)
         raw += _docker(f, rel)
     best: dict[tuple[str, str], Finding] = {}
     for fd in raw:

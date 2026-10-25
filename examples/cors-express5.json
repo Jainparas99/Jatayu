@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "adapter": "generic",
+  "framework": "Express",
+  "language": "JavaScript",
+  "source_version": "4.21.2",
+  "target_version": "5.3.0",
+  "repository_url": "https://github.com/expressjs/cors",
+  "source_commit": "5317ebe670db2aaebc1d496eb5d33493deefb3ed",
+  "install_command": "npm install --no-audit --no-fund --ignore-scripts && npm install --no-save --no-audit --no-fund --ignore-scripts express@{version}",
+  "test_command": "npx mocha --require test/support/env --reporter xunit --reporter-option output=test-results.xml",
+  "check_command": "npx eslint lib test",
+  "version_command": "node -p \"require('express/package.json').version\"",
+  "runtime_command": "node --version",
+  "junit_path": "test-results.xml",
+  "notes_urls": ["https://expressjs.com/en/guide/migrating-5.html"],
+  "working_directory": ".",
+  "timeout_seconds": 900
+}

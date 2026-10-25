@@ -53,6 +53,12 @@ class VerifyReport(BaseModel):
     source_commit: str = ""
     patch_sha256: str = ""
     # Set only by an independent artifact verifier, never by model output.
+    # Generic (non-Django) runs; None on older saved reports.
+    framework: str | None = None
+    framework_version: str | None = None
+    runtime_version: str | None = None
+    security_assessed: bool | None = None
+    tree_verified: bool | None = None
     artifacts_verified: bool = False
     evidence_source: Literal["agent_summary", "local_fixture", "sandbox_artifacts"] = (
         "agent_summary"
@@ -94,6 +100,10 @@ class RunSummary(BaseModel):
     source_commit: str = ""
     baseline_report: VerifyReport | None = None
     review_blockers: list[str] = Field(default_factory=list)
+    # Generic runs; None on older saved summaries (Django runs).
+    framework: str | None = None
+    source_version: str | None = None
+    scope: Literal["security", "tests_only"] | None = None
 
     @property
     def final(self) -> VerifyReport | None:

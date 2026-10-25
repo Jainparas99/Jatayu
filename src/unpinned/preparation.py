@@ -7,6 +7,7 @@ from urllib.parse import urlsplit
 
 from .adapters import Adapter, get
 from .config import settings
+from .execution import ExecutionSpec
 from .pack import Bundle
 from .parse import Patch, validate_patch
 from .repository import validate_django_version, validate_source
@@ -87,6 +88,8 @@ def recipe(
     source_commit: str,
     source_version: str,
     target_version: str,
+    *,
+    execution_spec: ExecutionSpec | None = None,
 ) -> dict:
     """An inventory and requested execution recipe; never migration evidence."""
     validate_source(repo_url, source_commit)
@@ -96,6 +99,21 @@ def recipe(
         )
     if not bundle.files:
         raise ValueError("input bundle contains no source files")
+    if execution_spec is not None:
+        execution_spec.check_repository(repo_url)
+        if execution_spec.source_commit and execution_spec.source_commit != source_commit:
+            raise ValueError("prepared commit differs from execution recipe")
+        if (adapter.name, adapter.framework, adapter.language, source_version, target_version) != (
+            execution_spec.adapter,
+            execution_spec.framework,
+            execution_spec.language,
+            execution_spec.source_version,
+            execution_spec.target_version,
+        ):
+            raise ValueError("prepared adapter differs from execution recipe")
+        working = bundle.root / execution_spec.working_directory
+        if not working.is_dir() or not working.resolve().is_relative_to(bundle.root.resolve()):
+            raise ValueError("recipe working directory is missing or escapes the repository")
     urls = adapter.notes_urls(source_version, target_version)
     for url in urls:
         parsed = urlsplit(url)
@@ -109,7 +127,7 @@ def recipe(
             "{minor}", ".".join(target_version.split(".")[:2])
         )
 
-    return {
+    value = {
         "schema_version": 1,
         "scope": "local_input_preparation",
         "artifacts_verified": False,
@@ -133,6 +151,15 @@ def recipe(
             "Preparation cannot establish target exposure or enable approval.",
         ],
     }
+    if execution_spec is not None:
+        value["execution_spec"] = execution_spec.model_dump(mode="json")
+        value["source_install_command"] = execution_spec.render(
+            execution_spec.install_command, source_version
+        )
+        value["source_test_command"] = execution_spec.render(
+            execution_spec.test_command, source_version
+        )
+    return value
 
 
 def save_recipe(value: dict):

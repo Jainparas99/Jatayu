@@ -11,7 +11,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from .config import ANTIGRAVITY, ARGON, SANDBOX_ALLOWLIST, settings
+from .config import ANTIGRAVITY, ARGON, GENERIC_EXTRA_DOMAINS, SANDBOX_ALLOWLIST, settings
 
 ThinkingLevel = str  # "low" | "medium" | "high"
 _PENDING = ("in_progress", "queued")
@@ -155,7 +155,7 @@ def run_agent(
     if previous_interaction_id and not environment_id:
         raise ValueError("continuing a managed agent requires its environment_id")
     domains = SANDBOX_ALLOWLIST if allowlist is None else allowlist
-    if any(domain not in SANDBOX_ALLOWLIST for domain in domains):
+    if any(domain not in SANDBOX_ALLOWLIST + GENERIC_EXTRA_DOMAINS for domain in domains):
         raise ValueError("domain is outside the configured sandbox allowlist")
     kwargs: dict[str, Any] = {
         "agent": ANTIGRAVITY,

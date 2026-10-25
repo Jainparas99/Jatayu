@@ -59,3 +59,18 @@ def test_skips_vendored_and_deep_dirs(tmp_path: Path):
     _write(tmp_path, "node_modules/x/.nvmrc", "16\n")
     _write(tmp_path, "a/b/c/d/requirements.txt", "Django==3.2\n")
     assert detect(tmp_path) == []
+
+
+def test_ruby_runtime_versions(tmp_path: Path):
+    _write(tmp_path, "a/.ruby-version", "ruby-3.1.4\n")
+    _write(tmp_path, "b/Gemfile", "source 'https://rubygems.org'\nruby '3.2.2'\ngem 'rack'\n")
+    gemspec = "Gem::Specification.new do |s|\n  s.required_ruby_version = '>= 2.7.6'\nend\n"
+    _write(tmp_path, "c/x.gemspec", gemspec)
+    _write(tmp_path, "d/Dockerfile", "FROM ruby:3.0-slim\n")
+    got = {(f.product, f.version, f.source, f.confidence) for f in detect(tmp_path)}
+    assert got == {
+        ("ruby", "3.1.4", "a/.ruby-version", "pinned"),
+        ("ruby", "3.2.2", "b/Gemfile", "pinned"),
+        ("ruby", "2.7.6", "c/x.gemspec", "declared"),
+        ("ruby", "3.0", "d/Dockerfile", "pinned"),
+    }

@@ -170,6 +170,16 @@ BUILTIN: dict[str, list[dict]] = {
         {"cycle": "3.14", "releaseDate": "2025-10-07", "eol": "2030-10-31", "latest": "3.14.9"},
         {"cycle": "3.15", "releaseDate": "2026-10-09", "eol": "2031-10-31", "latest": "3.15.1"},
     ],
+    "ruby": [
+        {"cycle": "2.6", "releaseDate": "2018-12-25", "eol": "2022-03-31", "latest": "2.6.10"},
+        {"cycle": "2.7", "releaseDate": "2019-12-25", "eol": "2023-03-31", "latest": "2.7.8"},
+        {"cycle": "3.0", "releaseDate": "2020-12-25", "eol": "2024-04-23", "latest": "3.0.7"},
+        {"cycle": "3.1", "releaseDate": "2021-12-25", "eol": "2025-03-26", "latest": "3.1.7"},
+        {"cycle": "3.2", "releaseDate": "2022-12-25", "eol": "2026-03-31", "latest": "3.2.11"},
+        {"cycle": "3.3", "releaseDate": "2023-12-25", "eol": "2027-03-31", "latest": "3.3.13"},
+        {"cycle": "3.4", "releaseDate": "2024-12-24", "eol": "2028-03-31", "latest": "3.4.12"},
+        {"cycle": "4.0", "releaseDate": "2025-12-25", "eol": "2029-03-31", "latest": "4.0.9"},
+    ],
     "nodejs": [
         {
             "cycle": "16",
@@ -257,6 +267,7 @@ LABELS = {
     "spring-boot": "Spring Boot",
     "python": "Python",
     "nodejs": "Node.js",
+    "ruby": "Ruby",
 }
 # Products whose version is a "major" cycle (Node 18) rather than "major.minor" (Django 4.2).
 MAJOR_ONLY = {"nodejs"}

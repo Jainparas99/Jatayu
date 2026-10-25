@@ -30,6 +30,26 @@ def _clone(repo_url: str) -> Path:
     return d / "repo"
 
 
+def _pinned_input(repo_url: str, expected_commit: str | None = None) -> tuple[Path, str]:
+    """Fetch a profile's immutable revision before packing; never run repository code."""
+    root = _clone(repo_url)
+    commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+    if expected_commit and commit != expected_commit:
+        subprocess.run(
+            ["git", "fetch", "--depth", "1", "origin", expected_commit],
+            cwd=root,
+            check=True,
+            timeout=120,
+        )
+        subprocess.run(
+            ["git", "checkout", "--detach", expected_commit], cwd=root, check=True, timeout=30
+        )
+        commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+        if commit != expected_commit:
+            raise ValueError("prepared source does not match the recipe's immutable commit")
+    return root, commit
+
+
 @app.command()
 def ping() -> None:
     """One gemini-4-argon call: proves the key and SDK work."""
@@ -65,12 +85,38 @@ def prepare(
     install_cmd: str | None = typer.Option(None),
     check_cmd: str | None = typer.Option(None),
     notes_url: list[str] | None = typer.Option(None, help="repeat for each upgrade-notes URL"),
+    recipe_path: Path | None = typer.Option(None, "--recipe", help="generic execution recipe JSON"),
 ) -> None:
     """Pin and inventory an input; save its recipe without running code or calling models."""
     from .pack import pack
     from .preparation import recipe, resolve_adapter, save_recipe
 
     try:
+        execution = None
+        if recipe_path is not None:
+            from .execution import load_execution_spec
+
+            if adapter != "generic":
+                raise ValueError("--recipe requires --adapter generic")
+            if any(
+                value is not None
+                for value in (
+                    source_version,
+                    target,
+                    framework,
+                    language,
+                    test_cmd,
+                    install_cmd,
+                    check_cmd,
+                    notes_url,
+                )
+            ):
+                raise ValueError("use either --recipe or individual preparation options")
+            execution = load_execution_spec(recipe_path, repo_url=repo_url)
+            source_version, target = execution.source_version, execution.target_version
+            framework, language = execution.framework, execution.language
+            test_cmd, install_cmd = execution.test_command, execution.install_command
+            check_cmd, notes_url = execution.check_command, execution.notes_urls
         selected, source, destination = resolve_adapter(
             adapter,
             source_version=source_version,
@@ -82,13 +128,18 @@ def prepare(
             check_command=check_cmd,
             notes_urls=notes_url,
         )
-        root = _clone(repo_url)
-        commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+        root, commit = _pinned_input(repo_url, execution.source_commit if execution else None)
         value = recipe(
-            selected, pack(root, adapter=selected), repo_url, commit, source, destination
+            selected,
+            pack(root, adapter=selected),
+            repo_url,
+            commit,
+            source,
+            destination,
+            execution_spec=execution,
         )
         directory = save_recipe(value)
-    except ValueError as exc:
+    except (ValueError, OSError) as exc:
         raise typer.BadParameter(str(exc)) from exc
     con.print(f"Prepared input: {directory / 'input.json'}")
     con.print("Commands have not been run. This is not verified migration evidence.")
@@ -101,7 +152,8 @@ def run(
         None, help="exact target Django version; defaults to settings"
     ),
     live: bool = typer.Option(False, help="small repo, thinking medium, no PLAN step"),
-    adapter: str = typer.Option("django", help="currently supported live adapter: django"),
+    adapter: str = typer.Option("django", help="django | generic (explicit recipe)"),
+    recipe_path: Path | None = typer.Option(None, "--recipe", help="generic execution recipe JSON"),
 ) -> None:
     """Full pipeline: pack → plan → migrate → verify/fix loop. Ends at the Approve page."""
     from .loop import run_loop
@@ -114,13 +166,37 @@ def run(
     from .runs import new_run_id, run_dir, save_json, save_text
     from .verify.agent import verify
 
-    s = settings()
+    if adapter == "generic":
+        from importlib import import_module
+
+        from .execution import load_execution_spec
+
+        if recipe_path is None:
+            raise typer.BadParameter("generic execution requires --recipe FILE")
+        if target is not None:
+            raise typer.BadParameter("set source_version and target_version in the generic recipe")
+        try:
+            execution = load_execution_spec(recipe_path, repo_url=repo_url)
+        except (ValueError, OSError) as exc:
+            raise typer.BadParameter(str(exc)) from exc
+        try:
+            backend = import_module("unpinned.generic_pipeline")
+        except ModuleNotFoundError as exc:
+            if exc.name != "unpinned.generic_pipeline":
+                raise
+            raise typer.BadParameter(
+                "The generic sandbox backend is not installed. Merge Claude's generic_pipeline "
+                "implementation; the recipe alone does not establish executable support."
+            ) from exc
+        summary = backend.run_generic(repo_url, spec=execution, live=live)
+        con.print(f"Generic execution saved: runs/{summary.run_id}")
+        con.print("Security remediation and publication require their separate review gates.")
+        return
     if adapter != "django":
-        raise typer.BadParameter(
-            "Generic remote verification is not implemented. "
-            "Use `jatayu prepare --adapter generic` "
-            "to inspect its input and execution recipe without calling a model."
-        )
+        raise typer.BadParameter("use --adapter django or --adapter generic with --recipe FILE")
+    if recipe_path is not None:
+        raise typer.BadParameter("--recipe requires --adapter generic")
+    s = settings()
     try:
         selected, source, destination = resolve_adapter(adapter, target_version=target)
     except ValueError as exc:

@@ -39,7 +39,21 @@ EXCLUDE_DIRS = {
     "site-packages",
     "htmlcov",
 }
-SECRET_NAMES = {".env", "secrets.py", "local_settings.py", "id_rsa", "credentials.json"}
+SECRET_NAMES = {
+    ".env",
+    "secrets.py",
+    "local_settings.py",
+    "id_rsa",
+    "credentials.json",
+    ".npmrc",
+    ".pypirc",
+    ".netrc",
+    ".yarnrc",
+    ".yarnrc.yml",
+    "id_ed25519",
+    "id_ecdsa",
+    "id_dsa",
+}
 MAX_FILE_BYTES = 200_000
 
 
@@ -66,7 +80,9 @@ class Bundle:
 
 def _wanted(rel: Path, adapter: Adapter | None = None) -> bool | None:
     """True/False, or None = include only if the file sniffs as text (any-language mode)."""
-    if any(part in EXCLUDE_DIRS for part in rel.parts[:-1]):
+    # Static JavaScript/TypeScript is application source in a generic repository.
+    excluded = EXCLUDE_DIRS - {"static"} if adapter and adapter.name == "generic" else EXCLUDE_DIRS
+    if any(part in excluded for part in rel.parts[:-1]):
         return False
     if rel.name in SECRET_NAMES or rel.name.startswith(".env"):
         return False

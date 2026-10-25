@@ -145,7 +145,7 @@ def test_generic_run_blocks_before_clone_or_paid_calls(monkeypatch):
     monkeypatch.setattr(cli, "_clone", lambda *a: pytest.fail("cloned before validation"))
     result = CliRunner().invoke(cli.app, ["run", URL, "--adapter", "generic"])
     assert result.exit_code == 2
-    assert "not implemented" in result.output
+    assert "requires --recipe" in result.output
 
 
 def test_untrusted_baseline_stops_before_migration(tmp_path, monkeypatch):
