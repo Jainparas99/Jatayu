@@ -179,6 +179,7 @@ def run(
         raise typer.BadParameter(
             "A passing baseline with independently verified sandbox artifacts is required."
         )
+    save_json(d / "summary.json", summary)  # a crash after this point still leaves a record
     notes = notes_for(selected, source, destination)
     plan = None
     if not live:

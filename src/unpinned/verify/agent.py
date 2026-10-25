@@ -7,6 +7,8 @@ The numbers in VerifyReport are the only numbers Jatayu ever shows.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import time
 from pathlib import Path
 
@@ -79,7 +81,8 @@ def collect(env_id: str, reported_dir: str | None, attempts: int = 3) -> tuple[d
                     if data is not None:
                         art[name] = data
                 returned = {
-                    n: _download(env_id, f"{prefix}/{n}") for n in ("verify.sh", "patch.tar.gz")
+                    n: _download(env_id, f"{prefix}/{n}")
+                    for n in ("verify.sh", "patch.tar.gz", "deletes.txt")
                 }
                 return art, returned, prefix
         if attempt + 1 < attempts:
@@ -138,6 +141,23 @@ def verify(
 
     directory = artifact_dir or settings().runs_dir / "artifacts" / (res.id or "unknown")[-24:]
     harness.save(art, directory)
+    # Keep exactly what came back, plus what we expected, so the integrity check is auditable.
+    harness.save({f"returned/{k}": v for k, v in returned.items() if v is not None}, directory)
+    (directory / "expected.json").write_text(
+        json.dumps(
+            {
+                "verify.sh": bundle.script_sha256,
+                "patch.tar.gz": bundle.patch_sha256,
+                "deletes.txt": hashlib.sha256(bundle.deletes.encode()).hexdigest(),
+                "source_commit": source_commit,
+                "django_version": django_version,
+                "probe_sha256": case.sha256 if case else None,
+                "interaction_id": res.id,
+                "environment_id": res.environment_id,
+            },
+            indent=1,
+        )
+    )
     (directory / "harness.sh").write_text(bundle.script)
     (directory / "agent-reply.txt").write_text(res.text or "")
     (directory / "location.txt").write_text(f"{res.environment_id}\n{prefix}\n")

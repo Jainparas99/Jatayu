@@ -33,6 +33,9 @@ def test_model_cannot_self_certify_sandbox_artifacts(monkeypatch):
         "run_agent",
         lambda *a, **k: NS(text=response.model_dump_json(), id="i", environment_id="env"),
     )
+    monkeypatch.setattr(
+        gemini, "download_file", lambda *a, **k: (_ for _ in ()).throw(OSError("offline"))
+    )
     report, _ = verify("https://github.com/example/app", "5.2.18", Patch(), source_commit="a" * 40)
     assert not report.artifacts_verified
     assert report.evidence_source == "agent_summary"

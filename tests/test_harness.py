@@ -63,7 +63,11 @@ def _art(bundle, **over):
 
 
 def _returned(bundle):
-    return {"verify.sh": bundle.script.encode(), "patch.tar.gz": bundle.patch_tgz}
+    return {
+        "verify.sh": bundle.script.encode(),
+        "patch.tar.gz": bundle.patch_tgz,
+        "deletes.txt": bundle.deletes.encode(),
+    }
 
 
 def _report(bundle, art, returned=None, version="5.2.18"):
@@ -180,3 +184,17 @@ def test_security_case_from_env(monkeypatch):
 def test_prefixes_from_reported_dir():
     assert _prefixes("/workspace/jatayu") == ["jatayu", "workspace/jatayu"]
     assert _prefixes(None) == ["jatayu"]
+
+
+def test_changed_deletion_manifest_is_not_verified():
+    b = harness.build(URL, COMMIT, "5.2.18", Patch(deletes=["old.py"]), CASE)
+    returned = _returned(b) | {"deletes.txt": b"security_probe.py\n"}
+    r = _report(b, _art(b), returned)
+    assert not r.artifacts_verified and "deletion manifest" in r.notes
+    r = _report(b, _art(b), {k: v for k, v in _returned(b).items() if k != "deletes.txt"})
+    assert not r.artifacts_verified
+
+
+def test_requirements_failure_cannot_be_masked_by_pinned_install():
+    b = harness.build(URL, COMMIT, "5.2.18", Patch(), CASE)
+    assert 'if [ "$REQ" -ne 0 ]; then rec install.exit "$REQ"' in b.script

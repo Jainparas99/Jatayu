@@ -182,11 +182,13 @@ while IFS= read -r p; do [ -n "$p" ] && rm -f -- "$W/repo/$p"; done < "$HERE/del
 
 python3 --version > "$OUT/python.txt" 2>&1
 python3 -m venv "$W/venv" && . "$W/venv/bin/activate"
-{{
-  pip install --disable-pip-version-check -q -r requirements.txt
-  pip install --disable-pip-version-check -q "Django=={django}" "unittest-xml-reporting>=3.2"
-}} > "$OUT/install.log" 2>&1
-rec install.exit $?
+pip install --disable-pip-version-check -q -r requirements.txt > "$OUT/install.log" 2>&1
+REQ=$?
+pip install --disable-pip-version-check -q "Django=={django}" "unittest-xml-reporting>=3.2" >> "$OUT/install.log" 2>&1
+PIN=$?
+# Either failure fails the install; record both so neither can mask the other.
+echo "requirements=$REQ pinned=$PIN" >> "$OUT/install.log"
+if [ "$REQ" -ne 0 ]; then rec install.exit "$REQ"; else rec install.exit "$PIN"; fi
 python -c "import django; print(django.get_version())" > "$OUT/django.txt" 2>> "$OUT/install.log"
 
 # Point Django's test runner at a JUnit writer without editing the project.
@@ -273,6 +275,8 @@ def report_from_artifacts(
         hashlib.sha256(returned["patch.tar.gz"]).hexdigest() != bundle.patch_sha256
     ):
         problems.append("patch archive in sandbox differs from the one uploaded")
+    if returned.get("deletes.txt") is None or returned["deletes.txt"] != bundle.deletes.encode():
+        problems.append("deletion manifest in sandbox differs from the one uploaded")
     head = _txt(art, "head.txt")
     if head != commit:
         problems.append(f"checked-out commit {head!r} is not the source commit")
@@ -367,4 +371,6 @@ def _probe(art: dict[str, bytes], case: SecurityCase, version: str) -> ExploitRe
 def save(art: dict[str, bytes], directory: Path) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     for name, data in art.items():
-        (directory / name).write_bytes(data)
+        target = directory / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
