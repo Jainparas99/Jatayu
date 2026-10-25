@@ -7,9 +7,26 @@ Django 4.2 stopped receiving security patches on April 7, 2026. Every framework 
 | Capability | What it does | Status |
 |---|---|---|
 | **Fleet** | Reads dependency manifests and lock files across repositories and ranks every end-of-life framework and runtime, with file and line evidence | Available |
-| **Upgrade engine** | Gemini 4 Argon reads the whole repository plus the official upgrade notes in one context and writes every changed file in a single long-decode response | Django adapter wired; first verified run in progress |
-| **Verification** | An Antigravity managed agent installs the target version, runs the project's own tests and a frozen security probe, and returns raw artifacts; failures loop back to Argon | Artifact parsers and gates implemented; cloud run in progress |
+| **Upgrade engine** | Gemini 4 Argon reads the whole repository plus the official upgrade notes in one context and writes every changed file in a single long-decode response | Verified end to end on Django 4.2 → 5.2 |
+| **Verification** | An Antigravity managed agent runs a controller-owned harness; Jatayu downloads the raw JUnit XML, logs, exit codes and probe output through the Files API and builds the report from those bytes only | Working; see results below |
 | **Review and approval** | Evidence, blockers and the patch SHA-256 on one page; nothing is published without explicit approval of that exact patch | Review implemented; PR publication disabled |
+
+## Results
+
+Measured on 2026-10-25 against [jatayu-demo-app](https://github.com/Jainparas99/jatayu-demo-app) at commit `554e82b`, a small Django 4.2 application written for this purpose that uses six APIs removed in Django 5.0/5.1 and contains a model formset with an editable primary key. Saved under [`runs/20261025-141628-unpinned-d39bc104`](runs/20261025-141628-unpinned-d39bc104).
+
+| Run | Django | Application tests | CVE-2026-87975 probe | Evidence |
+|---|---|---|---|---|
+| Before upgrade | 4.2.30 | 25 / 25 pass | **attack succeeds**, benign control passes | raw sandbox artifacts |
+| Version bump only (B0) | 5.2.18 | suite does not start: `Meta.index_together` removed | not reached | agent-reported (recorded before the artifact harness) |
+| **Jatayu (Gemini 4 Argon)** | **5.2.18** | **25 / 25 pass** | **attack blocked**, benign control passes | **raw sandbox artifacts** |
+
+- **One pass, no repairs:** Argon planned 16 breaking changes and wrote all 9 changed files (settings, models, migration, services, template and three test files) in a single response. The first verification was green, with 0 review blockers.
+- **Same probe both times:** the frozen probe's SHA-256 is `179c4224…` before and after; the migration patch is not allowed to touch it.
+- **Tests edited, not weakened:** test edits are limited to removed APIs (`assertQuerysetEqual` → `assertQuerySetEqual`, `override_settings` without removed settings). The parser rejects edits that remove tests or assertions or add skips, and the verified suite may not shrink below the baseline count.
+- **Cost and time:** migration call 26,348 input / 5,625 output tokens; whole run 6 min 52 s including baseline and verification (about 1.5 min per sandbox verification).
+
+The demo application is intentionally small. It shows the full loop with real evidence; it is not a benchmark of Argon's long-context scale.
 
 ## How it works
 
@@ -90,7 +107,7 @@ The unchanged probe reproduces CVE-2026-87975 (model formsets with editable prim
 
 | Adapter | Language | Fleet detection | Upgrade engine |
 |---|---|---|---|
-| Django | Python | Yes | Wired; first verified run in progress |
+| Django | Python | Yes | Verified end to end (4.2 → 5.2) |
 | Ruby on Rails | Ruby | Yes | Roadmap |
 | Spring Boot | Java | Yes | Roadmap |
 | Generic | Any | — | Input preparation only |
@@ -124,7 +141,8 @@ The command is `jatayu`; the internal Python package is `unpinned`.
 
 ## Limitations
 
-- Django is the only ecosystem with a wired upgrade path. Rails and Spring Boot are detected by Fleet but not yet upgradable.
+- Django is the only ecosystem with a verified upgrade path. Rails and Spring Boot are detected by Fleet but not yet upgradable.
+- **Threat model:** verification proves the uploaded harness, patch archive and deletion manifest come back byte-for-byte unchanged, the exact source commit and framework version, and the frozen probe file's hash. It does not yet prove that the worktree could not be modified by the sandbox agent between steps; the results are not tamper-proof execution attestation.
 - A passing result means the project's own tests, framework checks and the security probe passed. It is only as strong as the project's test suite.
 - PR publication is disabled until the cloud verification and exact-patch approval flow is complete.
 - Run artifacts are stored on local disk; container deployments need persistent storage.
@@ -133,14 +151,14 @@ The command is `jatayu`; the internal Python package is `unpinned`.
 
 Jatayu was built during the Gemini 4 Argon SF Hackathon (Cerebral Valley × Google DeepMind) on October 25, 2026. All code in this repository was written that day; the history starts at commit `bc0c942`.
 
-- **Upgrade pipeline:** packing, planning, long-decode migration, path-safe patch parsing, bounded repair loop (`src/unpinned/`)
-- **Verification:** Antigravity integration, raw-artifact parsers, evidence gate, patch review (`src/unpinned/verify/`, `artifacts/`, `evidence.py`, `review.py`)
+- **Upgrade pipeline:** packing, planning, long-decode migration, path-safe patch parsing with test-weakening checks, bounded repair loop (`src/unpinned/`)
+- **Verification:** controller-owned sandbox harness, Files API artifact retrieval with integrity checks, raw-artifact parsers, evidence gate, patch review (`src/unpinned/verify/`, `artifacts/`, `evidence.py`, `review.py`)
 - **Security fixture:** CVE-2026-87975 probe with benign control (`security_tests/`)
 - **Ecosystem adapters:** Django, generic, Rails and Spring Boot roadmap (`src/unpinned/adapters/`)
 - **Fleet:** end-of-life catalog, manifest detection, ranking, CLI and dashboard (`src/unpinned/fleet/`, `static/fleet.html`)
 - **Server and deployment:** review API, Runs dashboard, write-token gate, Dockerfile, Cloud Run script, GitHub Action
 
-Third-party projects are used only as inputs and are credited where results are reported.
+The demo target [jatayu-demo-app](https://github.com/Jainparas99/jatayu-demo-app) was also written that day. Third-party projects are used only as inputs and are credited where results are reported.
 
 ## License
 
