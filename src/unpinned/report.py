@@ -26,6 +26,8 @@ def _row(
     *,
     iterations: int | str,
     wall_seconds: float | None = None,
+    framework: str | None = None,
+    scope: str | None = None,
 ) -> dict:
     measured = bool(
         report and report.artifacts_verified and report.evidence_source == "sandbox_artifacts"
@@ -65,9 +67,13 @@ def _row(
         deprecations = "-" if report.deprecation_warnings is None else report.deprecation_warnings
         blocked = sum(e.blocked and e.outcome == "blocked" for e in report.exploits)
         exploits = f"{blocked}/{len(report.exploits)}" if report.exploits else "not recorded"
+    if scope == "tests_only" or (report and report.security_assessed is False):
+        exploits = "not assessed"
+    version = (report.framework_version or report.django_version) if report else None
     return {
         "run": label,
-        "django": report.django_version if measured and report.django_version else "unverified",
+        "framework": (report.framework if report else None) or framework or "Django",
+        "version": version if measured and version else "unverified" if report else "not recorded",
         "evidence": evidence,
         "tests": tests,
         "check_issues": checks,
@@ -83,13 +89,23 @@ def rows(runs: list[RunSummary]) -> list[dict]:
     out = []
     for r in sorted(runs, key=lambda r: ORDER.index(r.kind) if r.kind in ORDER else 99):
         if r.kind == "unpinned" and r.baseline_report is not None:
-            out.append(_row("Before upgrade", r.baseline_report, iterations="-"))
+            out.append(
+                _row(
+                    "Before upgrade",
+                    r.baseline_report,
+                    iterations="-",
+                    framework=r.framework,
+                    scope=r.scope,
+                )
+            )
         out.append(
             _row(
                 LABELS.get(r.kind, r.kind),
                 r.final,
                 iterations=len(r.iterations),
                 wall_seconds=r.wall_seconds,
+                framework=r.framework,
+                scope=r.scope,
             )
         )
     return out

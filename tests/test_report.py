@@ -51,7 +51,7 @@ def test_unverified_deprecation_claims_are_hidden():
     run.final.django_version = "5.2.18"
     row = rows([run])[0]
     assert row["deprecations"] == "unverified"
-    assert row["django"] == "unverified"
+    assert row["version"] == "unverified"
 
 
 def test_baseline_is_visible_when_migration_has_not_recorded_a_result():
@@ -62,7 +62,7 @@ def test_baseline_is_visible_when_migration_has_not_recorded_a_result():
     run.wall_seconds = 73.6
     before, after = rows([run])
     assert before["run"] == "Before upgrade"
-    assert before["tests"] == "25/25" and before["django"] == "4.2.30"
+    assert before["tests"] == "25/25" and before["version"] == "4.2.30"
     assert before["wall_s"] == "-"  # no baseline-specific timer was recorded
     assert after["tests"] == "not recorded" and after["evidence"] == "not recorded"
     assert after["iterations"] == 0
@@ -114,5 +114,36 @@ def test_before_and_after_use_their_own_recorded_versions():
     run.baseline_report = run.final.model_copy(deep=True)
     run.baseline_report.django_version = "4.2.30"
     before, after = rows([run])
-    assert before["django"] == "4.2.30" and after["django"] == "5.2.18"
+    assert before["version"] == "4.2.30" and after["version"] == "5.2.18"
     assert before["deprecations"] == "-"  # unavailable is distinct from measured zero
+
+
+def test_generic_versions_are_not_labeled_unverified_or_django():
+    run = _run("unpinned", 49, 0, False)
+    run.framework = "Express"
+    run.scope = "tests_only"
+    run.final.framework = "Express"
+    run.final.framework_version = "5.3.0"
+    run.final.security_assessed = False
+    run.final.exploits = []
+    run.baseline_report = run.final.model_copy(deep=True)
+    run.baseline_report.framework_version = "4.21.2"
+    before, after = rows([run])
+    assert before["framework"] == after["framework"] == "Express"
+    assert before["version"] == "4.21.2" and after["version"] == "5.3.0"
+    assert before["tests"] == after["tests"] == "49/49"
+    assert before["exploits_blocked"] == after["exploits_blocked"] == "not assessed"
+
+
+def test_untrusted_generic_version_is_still_hidden():
+    run = _run("unpinned", 49, 0, False)
+    run.final.framework = "Express"
+    run.final.framework_version = "5.3.0"
+    run.final.artifacts_verified = False
+    assert rows([run])[0]["version"] == "unverified"
+
+
+def test_tests_only_scope_cannot_imply_security_remediation():
+    run = _run("unpinned", 49, 0, True)
+    run.scope = "tests_only"
+    assert rows([run])[0]["exploits_blocked"] == "not assessed"
